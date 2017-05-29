@@ -46,13 +46,286 @@
 <div class="toctree-wrapper compound">
 </div>
 </div>
-<div class="section" id="indices-and-tables">
-<h1>Indices and tables<a class="headerlink" href="#indices-and-tables" title="Permalink to this headline">¶</a></h1>
-<ul class="simple">
-<li><a class="reference internal" href="genindex.html"><span class="std std-ref">Index</span></a></li>
-<li><a class="reference internal" href="py-modindex.html"><span class="std std-ref">Module Index</span></a></li>
-<li><a class="reference internal" href="search.html"><span class="std std-ref">Search Page</span></a></li>
-</ul>
+<div class="section" id="file-format-structure">
+<h1>File Format Structure<a class="headerlink" href="#file-format-structure" title="Permalink to this headline">¶</a></h1>
+<p>Struktura souboru pro ukládání flow dat [DRAFT]
+Dokument popisuje návrh nové datové struktury pro ukládání flow dat získaných pomocí protokolu IPFIX a NetFlow.
+Požadavky
+Před samotným návrhem je nutné si v krátkosti uvědomit některé požadavky, které musí nová struktura splňovat oproti současnému řešeni (tj. oproti ukládání do nfdump formátu). Uveďme si některé:
+Podpora položek dynamické délky
+Snadné přidávání nových datových položek toků (např. HTTP hlavičky, apod.)
+Jednoduchá rozšiřitelnost o nové funkcionality
+Struktura
+Každý soubor se skládá z hlavičky, která je následována bloky různých významových typů
+(šablony, flow data, statistiky, informace o exportéru atd.). Jednotlivé bloky jsou popsány v částech níže.</p>
+<blockquote>
+<div><table border="1" class="docutils">
+<colgroup>
+<col width="16%" />
+<col width="18%" />
+<col width="18%" />
+<col width="10%" />
+<col width="18%" />
+<col width="22%" />
+</colgroup>
+<tbody valign="top">
+<tr class="row-odd"><td><blockquote class="first">
+<div>File</div></blockquote>
+<p class="last">Header</p>
+</td>
+<td><dl class="first last docutils">
+<dt>Block</dt>
+<dd>1</dd>
+</dl>
+</td>
+<td><dl class="first last docutils">
+<dt>Block</dt>
+<dd>2</dd>
+</dl>
+</td>
+<td>…</td>
+<td><dl class="first last docutils">
+<dt>Block</dt>
+<dd>N</dd>
+</dl>
+</td>
+<td><dl class="first last docutils">
+<dt>Extension</dt>
+<dd>Table</dd>
+</dl>
+</td>
+</tr>
+</tbody>
+</table>
+</div></blockquote>
+<p>Obecná struktura souboru</p>
+<p>Hlavička souboru
+Jako první a vždy přítomná struktura souboru je tzv. hlavička souboru, která obsahuje:
+Magic   - konstanta pro identifikaci datového souboru a správné endianity
+Version - verze formátu souboru (pro případné budoucí nekompatibilní změny)
+Flags   - globální příznaky (např. zvolený algoritmus komprimace bloků, apod.)
+Number of blocks - celkový počet bloků v souboru
+Block table offset - offset na tabulku obsahující pozice (offsety) významných bloků v souboru. Pokud není tabulka v souboru přítomna, obsahuje hodnotu 0.</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="mi">0</span>                   <span class="mi">1</span>                   <span class="mi">2</span>                   <span class="mi">3</span>
+<span class="mi">0</span> <span class="mi">1</span> <span class="mi">2</span> <span class="mi">3</span> <span class="mi">4</span> <span class="mi">5</span> <span class="mi">6</span> <span class="mi">7</span> <span class="mi">8</span> <span class="mi">9</span> <span class="mi">0</span> <span class="mi">1</span> <span class="mi">2</span> <span class="mi">3</span> <span class="mi">4</span> <span class="mi">5</span> <span class="mi">6</span> <span class="mi">7</span> <span class="mi">8</span> <span class="mi">9</span> <span class="mi">0</span> <span class="mi">1</span> <span class="mi">2</span> <span class="mi">3</span> <span class="mi">4</span> <span class="mi">5</span> <span class="mi">6</span> <span class="mi">7</span> <span class="mi">8</span> <span class="mi">9</span> <span class="mi">0</span> <span class="mi">1</span>
+<span class="o">+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+</span>
+<span class="o">|</span>             <span class="n">Magic</span>             <span class="o">|</span>            <span class="n">Version</span>            <span class="o">|</span>
+<span class="o">+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+</span>
+<span class="o">|</span>                             <span class="n">Flags</span>                             <span class="o">|</span>
+<span class="o">+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+</span>
+<span class="o">|</span>                        <span class="n">Number</span> <span class="n">of</span> <span class="n">blocks</span>                       <span class="o">|</span>
+<span class="o">+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+</span>
+<span class="o">|</span>                      <span class="n">Extension</span> <span class="n">table</span> <span class="n">offset</span>                   <span class="o">|</span>
+<span class="o">|</span>                             <span class="p">(</span><span class="mi">64</span><span class="n">b</span><span class="p">)</span>                             <span class="o">|</span>
+<span class="o">+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+</span>
+</pre></div>
+</div>
+<p>Hlavička souboru
+Společná hlavička bloků
+Každý blok musí obsahovat společnou a pevně definovanou hlavičku, která slouží k určení typu bloku a jeho délky, což umožní čtecímu nástroji přeskočit bloky, kterým nebude rozumět. Může se jednat i o situaci, kdy starší verze nástroje čte soubory generované novějším nástrojem, který přidává rozšiřující bloky, které nemění způsob ukládání flow dat (např. přidává blok s indexy) a čtecí nástroj je může bezpečně přeskočit.</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="mi">0</span>                   <span class="mi">1</span>                   <span class="mi">2</span>                   <span class="mi">3</span>
+<span class="mi">0</span> <span class="mi">1</span> <span class="mi">2</span> <span class="mi">3</span> <span class="mi">4</span> <span class="mi">5</span> <span class="mi">6</span> <span class="mi">7</span> <span class="mi">8</span> <span class="mi">9</span> <span class="mi">0</span> <span class="mi">1</span> <span class="mi">2</span> <span class="mi">3</span> <span class="mi">4</span> <span class="mi">5</span> <span class="mi">6</span> <span class="mi">7</span> <span class="mi">8</span> <span class="mi">9</span> <span class="mi">0</span> <span class="mi">1</span> <span class="mi">2</span> <span class="mi">3</span> <span class="mi">4</span> <span class="mi">5</span> <span class="mi">6</span> <span class="mi">7</span> <span class="mi">8</span> <span class="mi">9</span> <span class="mi">0</span> <span class="mi">1</span>
+<span class="o">+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+</span>
+<span class="o">|</span>             <span class="n">Type</span>              <span class="o">|</span>             <span class="n">Flags</span>             <span class="o">|</span>
+<span class="o">+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+</span>
+<span class="o">|</span>                             <span class="n">Length</span>                            <span class="o">|</span>
+<span class="o">+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+</span>
+<span class="o">|</span>                                                               <span class="o">|</span>
+<span class="o">|</span>                <span class="o">~</span> <span class="o">~</span> <span class="o">~</span> <span class="n">Content</span> <span class="n">of</span> <span class="n">the</span> <span class="n">block</span> <span class="o">~</span> <span class="o">~</span> <span class="o">~</span>               <span class="o">|</span>
+<span class="o">|</span>                                                               <span class="o">|</span>
+<span class="o">+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+</span>
+</pre></div>
+</div>
+<p>Hlavička bloku</p>
+<p>Kde
+Type    - identifikace typu bloku (šablony, flow data, informace o exportéru, apod.)
+Flags   - příznaky (např. zda daný blok je komprimovaný)
+Length  - délka bloku včetně hlavičky</p>
+<p>Bloky
+Následující části popisují jednotlivé bloky z pohledu významu a jejich struktury.
+1. Blok identifikace exportéru (Exporter information block)
+Vzhledem k tomu, že jeden soubor může obsahovat flow data zachycená od více exportérů je vhodné být schopný identifikovat zdroj dat a jeho vlastnosti (např. aktivní vzorkování). Jelikož jsou zdroje dat odkazovány v hlavičce bloků flow dat (viz dále), je nutné, aby se blok s informacemi o exportéru vyskytoval v souboru před prvním blokem, který na něj odkazuje.</p>
+<p>V případě, že nastala situace, kdy exportér není znám nebo nemá význam ho uvádět, bude existovat implicitní záznam s ID 0, který agreguje informace od těchto neznámých zdrojů.</p>
+<p>TODO: V rámci struktury je třeba dodefinovat nutné položky sledované v rámci vzorkování.</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="mi">0</span>                   <span class="mi">1</span>                   <span class="mi">2</span>                   <span class="mi">3</span>
+<span class="mi">0</span> <span class="mi">1</span> <span class="mi">2</span> <span class="mi">3</span> <span class="mi">4</span> <span class="mi">5</span> <span class="mi">6</span> <span class="mi">7</span> <span class="mi">8</span> <span class="mi">9</span> <span class="mi">0</span> <span class="mi">1</span> <span class="mi">2</span> <span class="mi">3</span> <span class="mi">4</span> <span class="mi">5</span> <span class="mi">6</span> <span class="mi">7</span> <span class="mi">8</span> <span class="mi">9</span> <span class="mi">0</span> <span class="mi">1</span> <span class="mi">2</span> <span class="mi">3</span> <span class="mi">4</span> <span class="mi">5</span> <span class="mi">6</span> <span class="mi">7</span> <span class="mi">8</span> <span class="mi">9</span> <span class="mi">0</span> <span class="mi">1</span>
+<span class="o">+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+</span>
+<span class="o">|</span>                           <span class="n">Exporter</span> <span class="n">ID</span>                         <span class="o">|</span>
+<span class="o">+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+</span>
+<span class="o">|</span>                               <span class="n">ODID</span>                            <span class="o">|</span>
+<span class="o">+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+</span>
+<span class="o">|</span>                                                               <span class="o">|</span>
+<span class="o">|</span>                       <span class="n">IPv4</span> <span class="o">/</span> <span class="n">IPv6</span> <span class="n">address</span>                     <span class="o">|</span>
+<span class="o">|</span>                                                               <span class="o">|</span>
+<span class="o">|</span>                                                               <span class="o">|</span>
+<span class="o">+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+</span>
+<span class="o">|</span>                         <span class="n">Sampling</span>  <span class="p">(</span><span class="n">TODO</span><span class="p">)</span>                      <span class="o">|</span>
+<span class="o">+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+</span>
+<span class="o">|</span>                                                               <span class="o">|</span>
+<span class="o">~</span>                         <span class="n">Description</span> <span class="p">(</span><span class="mi">64</span><span class="n">B</span><span class="p">)</span>                     <span class="o">~</span>
+
+<span class="o">~</span>                                                               <span class="o">~</span>
+<span class="o">|</span>                                                               <span class="o">|</span>
+<span class="o">+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+</span>
+</pre></div>
+</div>
+<p>Struktura bloku s informací o exportéru (bez společné hlavičky)</p>
+<p>Samotná struktura by měla obsahovat následující položky
+Exporter ID     - unikátní identifikační číslo exportéru v rámci celého souboru
+ODID    - Observation Domain ID (viz definice dle IPFIX)
+IP address      - IPv4/IPv6 adresa exportéru, kde IPv4 je zakódována jako “IPv4-Mapped IPv6 Address” (RFC 4291, sekce 2.5.5.2.)
+Sampling        - metoda a frekvence vzorkování
+Description     - popis exportéru (např. název linky,…)</p>
+<p>2. Blok šablon (Template block)
+Pro zajištění podpory flexibilního formátu s podporou dynamických položek je nutné popsat strukturu flow dat za pomoci šablon. Funkcí šablony je určit, které datové položky se v záznamu nachází (např. zdrojová + cílová adresa, počet bytů, URL adresa,…), na jaké pozici a jejich velikost. Jelikož mohou od exportéru přicházet data obohacená o různé informace, je nutné podporovat současné použití více šablon - některé toky např. HTTP provoz může být obohacen o URL adresu, ale v jiné situaci (obecný provoz) se tyto položky nevyskytují. Šablony nejsou navázány na zdroj dat - jinými slovy, jedna šablona může být používána více exportéry.</p>
+<p>V rámci jednoho bloku šablon je možné definovat 1 až N šablon, kde každá šablona je identifikována jednoznačným číslem a je platná od své definice dále s tím, že není možné ji nijak předefinovat/zrušit. Z toho plyne, že definice šablony se musí vyskytovat v souboru dříve než blok flow dat, který je jí popsán.</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="o">+---------------------------------------------------------------+</span>
+<span class="o">|</span>       <span class="n">Common</span> <span class="n">Block</span> <span class="n">header</span> <span class="p">(</span><span class="nb">type</span> <span class="o">==</span> <span class="n">LNF_FILE_BLOCK_TMPLT</span><span class="p">)</span>      <span class="o">|</span>
+<span class="o">+---------------------------------------------------------------+</span>
+<span class="o">|</span>                         <span class="n">Template</span> <span class="n">Record</span> <span class="mi">1</span>                     <span class="o">|</span>
+<span class="o">+---------------------------------------------------------------+</span>
+<span class="o">|</span>                         <span class="n">Template</span> <span class="n">Record</span> <span class="mi">2</span>                     <span class="o">|</span>
+<span class="o">+---------------------------------------------------------------+</span>
+<span class="o">|</span>                                <span class="o">...</span>                            <span class="o">|</span>
+<span class="o">+---------------------------------------------------------------+</span>
+<span class="o">|</span>                         <span class="n">Template</span> <span class="n">Record</span> <span class="n">N</span>                     <span class="o">|</span>
+<span class="o">+---------------------------------------------------------------+</span>
+</pre></div>
+</div>
+<p>Struktura bloku se šablonami</p>
+<p>Každá šablona v rámci bloku obsahuje hlavičku s číslem šablony a počtem položek, které definuje. Pro budoucí využití je zde rezervována 2 bytová položka, jejíž hodnota musí být v tuto chvíli nulová. Za touto hlavičkou je umístěn seznam identifikátorů datových položek, kde pořadí je směrodatné a určuje posloupnost položek ve flow záznamu. Z důvodu optimalizace přístupu k datovým položkám (viz. blok flow dat) musí být prve uvedeny všechny položky fixní délky a až následně položky dynamické délky. Prokládání těchto položek v rámci posloupnosti není dovoleno.</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="mi">0</span>                   <span class="mi">1</span>                   <span class="mi">2</span>                   <span class="mi">3</span>
+<span class="mi">0</span> <span class="mi">1</span> <span class="mi">2</span> <span class="mi">3</span> <span class="mi">4</span> <span class="mi">5</span> <span class="mi">6</span> <span class="mi">7</span> <span class="mi">8</span> <span class="mi">9</span> <span class="mi">0</span> <span class="mi">1</span> <span class="mi">2</span> <span class="mi">3</span> <span class="mi">4</span> <span class="mi">5</span> <span class="mi">6</span> <span class="mi">7</span> <span class="mi">8</span> <span class="mi">9</span> <span class="mi">0</span> <span class="mi">1</span> <span class="mi">2</span> <span class="mi">3</span> <span class="mi">4</span> <span class="mi">5</span> <span class="mi">6</span> <span class="mi">7</span> <span class="mi">8</span> <span class="mi">9</span> <span class="mi">0</span> <span class="mi">1</span>
+<span class="o">+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+</span>
+<span class="o">|</span>                           <span class="n">Template</span> <span class="n">ID</span>                         <span class="o">|</span>
+<span class="o">+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+</span>
+<span class="o">|</span>           <span class="n">Field</span> <span class="n">count</span>         <span class="o">|</span>          <span class="o">~</span> <span class="n">reserved</span> <span class="o">~</span>         <span class="o">|</span>
+<span class="o">+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+</span>
+<span class="o">|</span>                                                               <span class="o">|</span>
+<span class="o">|</span>        <span class="o">~</span> <span class="o">~</span> <span class="o">~</span> <span class="n">One</span> <span class="ow">or</span> <span class="n">more</span> <span class="n">Template</span> <span class="n">field</span> <span class="n">specifiers</span> <span class="o">~</span> <span class="o">~</span> <span class="o">~</span>      <span class="o">|</span>
+<span class="o">|</span>                                                               <span class="o">|</span>
+<span class="o">+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+</span>
+</pre></div>
+</div>
+<p>Struktura šablony</p>
+<p>Každá položka v rámci šablony je určena na základě Enterprise number (identifikace vlastníka rozsahu) a ID (identifikace položky v rámci rozsahu). Vychází se tudíž z definice převzaté z protokolu IPFIX, kde základní položky (zdrojová/cílová adresa, počet bytů/paketů/flow, apod.) jsou definovány a udržovány v seznamu IANA (Enterprise number 0) a specifické položky jednotlivých vlastníků (např. URL adresa, informace o SIP, atd.) jsou pak spravovány samotnými organizacemi.</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="mi">0</span>                   <span class="mi">1</span>                   <span class="mi">2</span>                   <span class="mi">3</span>  <span class="n">_</span>
+<span class="mi">0</span> <span class="mi">1</span> <span class="mi">2</span> <span class="mi">3</span> <span class="mi">4</span> <span class="mi">5</span> <span class="mi">6</span> <span class="mi">7</span> <span class="mi">8</span> <span class="mi">9</span> <span class="mi">0</span> <span class="mi">1</span> <span class="mi">2</span> <span class="mi">3</span> <span class="mi">4</span> <span class="mi">5</span> <span class="mi">6</span> <span class="mi">7</span> <span class="mi">8</span> <span class="mi">9</span> <span class="mi">0</span> <span class="mi">1</span> <span class="mi">2</span> <span class="mi">3</span> <span class="mi">4</span> <span class="mi">5</span> <span class="mi">6</span> <span class="mi">7</span> <span class="mi">8</span> <span class="mi">9</span> <span class="mi">0</span> <span class="mi">1</span><span class="n">_</span>
+<span class="o">+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+</span>
+<span class="o">|</span>                       <span class="n">Enterprise</span> <span class="n">number</span>                       <span class="o">|</span>
+<span class="o">+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+</span>
+<span class="o">|</span>           <span class="n">Field</span> <span class="n">ID</span>            <span class="o">|</span>              <span class="n">Length</span>           <span class="o">|</span>
+<span class="o">+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+</span>
+</pre></div>
+</div>
+<p>Struktura identifikace datové položky v šabloně</p>
+<p>Pro každou položku je uvedena také délka určující fixní délku ve flow záznamu. V případě, že délka položky není předem známá tj. její velikost je dynamická, má délka hodnotu UINT16_MAX (65535).</p>
+<p>3. Blok flow dat (Flow data block)
+Datový blok se skládá ze speciální hlavičky, kterou následuje 1 až N flow záznamů. Speciální hlavička obsahuje informace o šabloně, která byla použita při zápisu všech záznamů v rámci tohoto bloku, a identifikační číslo exportéru, který záznamy poslal. V případě aktivní komprese bloků jsou komprimována až data uvedená za hlavičkou tj. samotná speciální hlavička komprimována není. Důvodem je možnost optimalizace vyhledávání přítomnosti datových položek v blocích, kdy při filtraci se na základě analýzy šablon určí, zda se položka v šabloně nachází, a má tudíž blok popsaný touto šablonou smysl dekomprimovat.</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="o">+---------------------------------------------------------------+</span>
+<span class="o">|</span>      <span class="n">Common</span> <span class="n">Block</span> <span class="n">header</span> <span class="p">(</span><span class="nb">type</span> <span class="o">==</span> <span class="n">LNF_FILE_BLOCK_FLOW</span><span class="p">)</span>        <span class="o">|</span>
+<span class="o">+---------------------------------------------------------------+</span>
+<span class="o">|</span>                        <span class="n">Data</span> <span class="n">block</span> <span class="n">header</span>                      <span class="o">|</span>
+<span class="o">+---------------------------------------------------------------+</span>
+<span class="o">|</span>                          <span class="n">Flow</span> <span class="n">Record</span> <span class="mi">1</span>                        <span class="o">|</span>
+<span class="o">+---------------------------------------------------------------+</span>
+<span class="o">|</span>                          <span class="n">Flow</span> <span class="n">Record</span> <span class="mi">2</span>                        <span class="o">|</span>
+<span class="o">+---------------------------------------------------------------+</span>
+<span class="o">|</span>                              <span class="o">...</span>                              <span class="o">|</span>
+<span class="o">+---------------------------------------------------------------+</span>
+<span class="o">|</span>                          <span class="n">Flow</span> <span class="n">Record</span> <span class="n">N</span>                        <span class="o">|</span>
+<span class="o">+---------------------------------------------------------------+</span>
+</pre></div>
+</div>
+<p>Struktura bloku flow dat</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="mi">0</span>                   <span class="mi">1</span>                   <span class="mi">2</span>                   <span class="mi">3</span>  <span class="n">_</span>
+<span class="mi">0</span> <span class="mi">1</span> <span class="mi">2</span> <span class="mi">3</span> <span class="mi">4</span> <span class="mi">5</span> <span class="mi">6</span> <span class="mi">7</span> <span class="mi">8</span> <span class="mi">9</span> <span class="mi">0</span> <span class="mi">1</span> <span class="mi">2</span> <span class="mi">3</span> <span class="mi">4</span> <span class="mi">5</span> <span class="mi">6</span> <span class="mi">7</span> <span class="mi">8</span> <span class="mi">9</span> <span class="mi">0</span> <span class="mi">1</span> <span class="mi">2</span> <span class="mi">3</span> <span class="mi">4</span> <span class="mi">5</span> <span class="mi">6</span> <span class="mi">7</span> <span class="mi">8</span> <span class="mi">9</span> <span class="mi">0</span> <span class="mi">1</span><span class="n">_</span>
+<span class="o">+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+</span>
+<span class="o">|</span>                          <span class="n">Template</span> <span class="n">ID</span>                          <span class="o">|</span>
+<span class="o">+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+</span>
+<span class="o">|</span>                          <span class="n">Exporter</span> <span class="n">ID</span>                          <span class="o">|</span>
+<span class="o">+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+</span>
+</pre></div>
+</div>
+<p>Speciální hlavička bloku flow dat</p>
+<p>Struktura dat uložených v datech vychází z příslušné šablony a může vypadat např. následovně (v závislosti na použité šabloně):</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="mi">0</span>                   <span class="mi">1</span>                   <span class="mi">2</span>                   <span class="mi">3</span>   <span class="n">_</span>
+<span class="mi">0</span> <span class="mi">1</span> <span class="mi">2</span> <span class="mi">3</span> <span class="mi">4</span> <span class="mi">5</span> <span class="mi">6</span> <span class="mi">7</span> <span class="mi">8</span> <span class="mi">9</span> <span class="mi">0</span> <span class="mi">1</span> <span class="mi">2</span> <span class="mi">3</span> <span class="mi">4</span> <span class="mi">5</span> <span class="mi">6</span> <span class="mi">7</span> <span class="mi">8</span> <span class="mi">9</span> <span class="mi">0</span> <span class="mi">1</span> <span class="mi">2</span> <span class="mi">3</span> <span class="mi">4</span> <span class="mi">5</span> <span class="mi">6</span> <span class="mi">7</span> <span class="mi">8</span> <span class="mi">9</span> <span class="mi">0</span> <span class="mi">1</span> <span class="n">_</span>
+<span class="o">+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+</span>
+<span class="o">|</span>          <span class="n">Record</span> <span class="n">Length</span>        <span class="o">|</span>         <span class="n">Field</span> <span class="n">Value</span> <span class="mi">1</span>         <span class="o">|</span>
+<span class="o">+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+</span>
+<span class="o">|</span>                         <span class="n">Field</span> <span class="n">Value</span> <span class="mi">2</span>                         <span class="o">|</span>
+<span class="o">+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+</span>
+<span class="o">|</span>          <span class="n">Field</span> <span class="n">Value</span> <span class="mi">3</span>        <span class="o">|</span>         <span class="n">Field</span> <span class="n">Value</span> <span class="mi">4</span>         <span class="o">|</span>
+<span class="o">+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+</span>
+<span class="o">|</span>          <span class="n">Field</span> <span class="n">Value</span> <span class="mi">5</span>        <span class="o">|</span>         <span class="n">Field</span> <span class="n">Value</span> <span class="mi">6</span>         <span class="o">|</span>
+<span class="o">+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+</span>
+<span class="o">|</span>                         <span class="n">Field</span> <span class="n">Value</span> <span class="mi">7</span>                         <span class="o">|</span>
+<span class="o">+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+</span>
+<span class="o">|</span>          <span class="n">OFFSET</span> <span class="n">Field</span> <span class="mi">8</span>       <span class="o">|</span>         <span class="n">LENGTH</span> <span class="n">Field</span> <span class="mi">8</span>        <span class="o">|</span>  <span class="n">Static</span>
+<span class="o">+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+</span>  <span class="n">part</span>
+<span class="o">|</span>          <span class="n">OFFSET</span> <span class="n">Field</span> <span class="mi">9</span>       <span class="o">|</span>         <span class="n">LENGTH</span> <span class="n">Field</span> <span class="mi">9</span>        <span class="o">|</span>
+<span class="o">+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+</span> <span class="o">-</span> <span class="o">-</span> <span class="o">-</span> <span class="o">-</span>
+<span class="o">|</span>                         <span class="n">Field</span> <span class="n">Value</span> <span class="mi">8</span>                         <span class="o">|</span>
+<span class="o">+</span>                                               <span class="o">+-+-+-+-+-+-+-+-+</span>  <span class="n">Dynamic</span>
+<span class="o">|</span>                                               <span class="o">|</span>               <span class="o">|</span>  <span class="n">part</span>
+<span class="o">+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+</span>               <span class="o">+</span>
+<span class="o">|</span>                         <span class="n">Field</span> <span class="n">Value</span> <span class="mi">9</span>                         <span class="o">|</span>
+<span class="o">+</span>                               <span class="o">+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+</span>
+<span class="o">|</span>                               <span class="o">|</span>                               <span class="n">_</span>
+<span class="o">+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+</span>                               <span class="n">_</span>
+</pre></div>
+</div>
+<p>Záznam na začátku obsahuje 2B hodnotu určující délku samotného záznamu a dále je strukturovaný v závislosti na šabloně. Samotný záznam je možné rozdělit na 3 části:
+Hodnoty položek pevné délky
+Meta informace o položkách dynamické délky
+Hodnoty položek dynamické délky</p>
+<p>Kde druhá část obsahuje pro každou dynamickou položku její offset od začátku záznamu a délku v bytech. Meta informace a dynamických položky jsou také seřazeny dle pořadí, které bylo uvedeno v šabloně. V rámci záznamu by se neměla vyskytovat prázdná nevyužitá místa.</p>
+<p>První dvě části záznamu je možné pojmenovat jako sekci pevné délky, neboť jejich celková velikost je vždy stejná a všechna data jsou přítomna na pevných offsetech daných šablonou, což umožňuje rychlý přístup k datům při čtení. Poslední část je dynamická, jelikož její celková velikost a počáteční pozice jednotlivých hodnot se mohou vyskytovat na různých místech u záznamů dle stejné šablony.</p>
+<p>(Poznámka: struktura a popis ukládaného záznamu vychází z formátu a dokumentace
+UniRec používaném v rámci Nemea Frameworku).</p>
+<p>4. Tabulka offsetů bloků (Block offset table)
+Pro možnost snadno zjistit pozici významných bloků bez nutnosti procházet a zpracovat celý soubor při jeho čtení, bude v rámci každého souboru existovat nejvýše jedna tabulka offsetů bloků. Mezi sledované bloky patří všechny bloky, kromě bloků šablon a flow dat tj. např. bloky identifikace exportéru, bloky statistik, bloky indexů (není součástí současného návrhu), apod. Mezi tyto bloky tudíž budou patřit i bloky specifikované v budoucí revizi.</p>
+<p>Jakmile v rámci souboru existuje alespoň jeden ze sledovaných bloků, musí tabulka offsetů existovat a v tabulce musí být uveden právě jednou offset všech sledovaných bloků, které jsou v souboru obsaženy. Čtecí proces se tak může spolehnout, že žádný takový blok nebude “skryt”, a nemusí tudíž sekvenčně procházet všechny bloky souboru.</p>
+<p>Jelikož množství bloků může v průběhu vzniku souboru přibývat a nelze tedy předem určit jejich množství a pozici, musí být tato tabulka vložena až na samotný konec souboru. Pro rychlý přístup k této tabulce offsetů se pak v hlavičce souboru nachází odkaz (offset) na její začátek (vyplněn při uzavírání souboru).</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="o">+---------------------------------------------------------------+</span>
+<span class="o">|</span>    <span class="n">Common</span> <span class="n">Block</span> <span class="n">header</span> <span class="p">(</span><span class="nb">type</span> <span class="o">==</span> <span class="n">LNF_FILE_BLOCK_OFFSET_TBL</span><span class="p">)</span>    <span class="o">|</span>
+<span class="o">+---------------------------------------------------------------+</span>
+<span class="o">|</span>                       <span class="n">Block</span> <span class="n">Offset</span> <span class="n">Record</span> <span class="mi">1</span>                   <span class="o">|</span>
+<span class="o">+---------------------------------------------------------------+</span>
+<span class="o">|</span>                       <span class="n">Block</span> <span class="n">Offset</span> <span class="n">Record</span> <span class="mi">2</span>                   <span class="o">|</span>
+<span class="o">+---------------------------------------------------------------+</span>
+<span class="o">|</span>                               <span class="o">...</span>                             <span class="o">|</span>
+<span class="o">+---------------------------------------------------------------+</span>
+<span class="o">|</span>                       <span class="n">Block</span> <span class="n">Offset</span> <span class="n">Record</span> <span class="n">N</span>                   <span class="o">|</span>
+<span class="o">+---------------------------------------------------------------+</span>
+</pre></div>
+</div>
+<p>Struktura tabulky offsetů bloků</p>
+<p>Každý záznam tabulky popisuje typ bloku a jeho offset.</p>
+<div class="highlight-default"><div class="highlight"><pre><span></span><span class="mi">0</span>                   <span class="mi">1</span>                   <span class="mi">2</span>                   <span class="mi">3</span>  <span class="n">_</span>
+<span class="mi">0</span> <span class="mi">1</span> <span class="mi">2</span> <span class="mi">3</span> <span class="mi">4</span> <span class="mi">5</span> <span class="mi">6</span> <span class="mi">7</span> <span class="mi">8</span> <span class="mi">9</span> <span class="mi">0</span> <span class="mi">1</span> <span class="mi">2</span> <span class="mi">3</span> <span class="mi">4</span> <span class="mi">5</span> <span class="mi">6</span> <span class="mi">7</span> <span class="mi">8</span> <span class="mi">9</span> <span class="mi">0</span> <span class="mi">1</span> <span class="mi">2</span> <span class="mi">3</span> <span class="mi">4</span> <span class="mi">5</span> <span class="mi">6</span> <span class="mi">7</span> <span class="mi">8</span> <span class="mi">9</span> <span class="mi">0</span> <span class="mi">1</span><span class="n">_</span>
+<span class="o">+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+</span>
+<span class="o">|</span>            <span class="n">Type</span>               <span class="o">|</span>                               <span class="o">|</span>
+<span class="o">+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+</span>                               <span class="o">+</span>
+<span class="o">|</span>                          <span class="n">Block</span> <span class="n">Offset</span>                         <span class="o">|</span>
+<span class="o">+</span>                               <span class="o">+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+</span>
+<span class="o">|</span>                               <span class="o">|</span>                               <span class="n">_</span>
+<span class="o">+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+</span>                               <span class="n">_</span>
+</pre></div>
+</div>
+<p>Záznam tabulky offsetů bloků</p>
+<p>5. Bloky statistik
+Pro rychlé statistické informace o tocích obsažených v rámci daného souboru, budou na konci souboru (před tabulkou offsetů bloků) umístěny bloky statistik jednotlivých exportérů.</p>
+<p>Blok statistik obsahuje identifikační číslo exportéru a k němu náležící statistiky:
+celkový počet toků/bytů/paketů
+počet TCP/UDP/ICMP/ostatních toků
+počet TCP/UDP/ICMP/ostatních bytů
+počet TCP/UDP/ICMP/ostatních paketů</p>
+<p>TODO:
+Přesná struktura bloku
+Objevily se tendence zapracovat generickou strukturu statistik umožnující detailněji specifikovat statistiky dle aktuálních požadavků (např. pro daný port, atd.), kde by se také pravděpodobně zužitkovaly šablony.
+Možnost mít více statistik od jednoho zdroje v rámci souboru - např. v rámci 5 minutového souboru by byly přítomny statistiky po 1 minutě, což by v důsledku znamenalo, že už by bloky statistik nemusely být na konci souboru (tj. mohly by být rozprostřené). Otázka je zda to má význam, neboť některé toky trvají kratší dobu (jednotky sekund) a jiné delší dobu (jednotky minut), přičemž o delších tocích se dozvíme později až je např. statistiky zaznamenána přičemž náleží do příslušného minutového intervalu.</p>
 </div>
 
 
@@ -64,7 +337,7 @@
   <h3><a href="#">Table Of Contents</a></h3>
   <ul>
 <li><a class="reference internal" href="#">Welcome to Flow Data Storage’s documentation!</a></li>
-<li><a class="reference internal" href="#indices-and-tables">Indices and tables</a></li>
+<li><a class="reference internal" href="#file-format-structure">File Format Structure</a></li>
 </ul>
 <div class="relations">
 <h3>Related Topics</h3>
