@@ -176,8 +176,7 @@ TEST_F(Drec_basic, defaultConverter)
     EXPECT_EQ(buffer_size, buffer_size_orig);
 
     // Try to parse the JSON string and check values
-    Config cfg;
-    ASSERT_NO_THROW(cfg = parse_string(buffer_ptr, JSON, "drec2json"));
+    Config cfg = parse_string(buffer_ptr, JSON, "drec2json");
     EXPECT_EQ((std::string) cfg["iana:sourceIPv4Address"], VALUE_SRC_IP4);
     EXPECT_EQ((std::string) cfg["iana:destinationIPv4Address"], VALUE_DST_IP4);
     EXPECT_EQ((uint16_t) cfg["iana:sourceTransportPort"], VALUE_SRC_PORT);
@@ -228,6 +227,27 @@ TEST_F(Drec_basic, tooShortBuffer)
 }
 
 // TODO: add more tests here...
+// Convert Data Record with realloca support
+TEST_F(Drec_basic, allowRealloc)
+{
+    constexpr size_t BSIZE = 5U;
+    char* buff = (char*) malloc(BSIZE);
+    uint32_t flags = FDS_CD2J_ALLOW_REALLOC;
+    size_t buff_size = BSIZE;
+
+    int rc = fds_drec2json(&m_drec, flags, &buff, &buff_size);
+    ASSERT_GT(rc, 0);
+    EXPECT_EQ(size_t(rc), strlen(buff));
+    EXPECT_NE(buff_size, BSIZE);
+
+}
+
+// Function will get more flags
+/*TEST_F(Drec_basic, moreFlags)
+{
+    //TODO
+}
+*/
 
 
 // -------------------------------------------------------------------------------------------------
@@ -314,11 +334,23 @@ TEST_F(Drec_biflow, simpleParser)
     // NOTE: "iana:interfaceName" has multiple occurrences, therefore, it MUST be converted
     //  into an array i.e. "iana:interfaceName" : ["", "enp0s31f6"]
 
-    // EXPECT_TRUE(cfg["iana:interfaceName"].is_array());
-    // auto cfg_arr = cfg["iana:interfaceName"].as_array();
-    // EXPECT_EQ(cfg_arr.size(), 2U);
-    // EXPECT_NE(cfg_arr.find(VALUE_IFC1), cfg_arr.end());
-    // EXPECT_NE(cfg_arr.find(VALUE_IFC2), cfg_arr.end());
+    constexpr size_t BSIZE = 5U;
+    char* buff = (char*) malloc(BSIZE);
+    uint32_t flags = FDS_CD2J_ALLOW_REALLOC;
+    size_t buff_size = BSIZE;
+
+    int rc = fds_drec2json(&m_drec, flags, &buff, &buff_size);
+    ASSERT_EQ(rc, strlen(buff));
+    Config cfg = parse_string(buff, JSON, "drec2json");
+    EXPECT_TRUE(cfg["iana:interfaceName"].is_array());
+    auto cfg_arr = cfg["iana:interfaceName"].as_array();
+    EXPECT_EQ(cfg_arr.size(), 2U);
+    EXPECT_NE(cfg_arr.find(VALUE_IFC1), cfg_arr.end());
+    EXPECT_NE(cfg_arr.find(VALUE_IFC2), cfg_arr.end());
+
+
+/*
+*/
 }
 
 // Convert Data Record from reverse point of view
@@ -326,5 +358,3 @@ TEST_F(Drec_biflow, reverseView)
 {
     // TODO: implement me!
 }
-
-
