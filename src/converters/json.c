@@ -1,11 +1,3 @@
-/*
-    TODO
-
-    добавить навратовые годноты + остыльные функции
-
-*/
-
-
 /**
  * \file src/converters/converters.c
  * \author Lukas Hutak <lukas.hutak@cesnet.cz>
@@ -66,7 +58,8 @@ size_t buffer_used(const struct context *buffer) {return buffer->write_begin - b
  * \return #FDS_ERR_NOMEM in case of memory allocation error
  * \retunr #FDS_ERR_BUFFER in case if flag for reallocation is not set
  */
-int buffer_reserve( struct context *buffer, size_t n)
+int
+buffer_reserve (struct context *buffer, size_t n)
 {
     if (n <= buffer_alloc(buffer)) {
         // Nothing to do
@@ -729,17 +722,22 @@ add_field_name(struct context *buffer, const struct fds_drec_field *field)
 }
 /**
  * \breaf Function for scoping fields with same ID
- write_array(rec, record, fn, def->id, def->en)
+ *
  * \param[in] rec
  * \param[in] buffer
  * \param[in] fn Convert for field
  * \param[in] en Enterprise Number of field
  * \param[in] id ID of field
+ *
+ * \return #FDS_OK on success
+ * \return ret_code in case of memory allocation error
+ *
 */
 int
 multi_fields (const struct fds_drec *rec, struct context *buffer,
     converter_fn fn, uint32_t en, uint16_t id)
 {
+    // inicializatio of iterator
     uint16_t iter_flag = (buffer->flags & FDS_CD2J_IGNORE_UNKNOWN) ? FDS_DREC_UNKNOWN_SKIP : 0;
 
     struct fds_drec_iter iter_mul_f;
@@ -751,10 +749,10 @@ multi_fields (const struct fds_drec *rec, struct context *buffer,
         return ret_code;
     }
 
+    // looking for multi fields
     while (fds_drec_iter_next(&iter_mul_f) != FDS_EOC) {
-        if ((iter_mul_f.field.info->flags | FDS_TFIELD_MULTI_IE) == 1){
-            const struct fds_tfield *def = iter_mul_f.field.info;
-            if (def->id == id && def->en == en){
+        const struct fds_tfield *def = iter_mul_f.field.info;
+        if ((iter_mul_f.field.info->flags & FDS_TFIELD_MULTI_IE) != 0 && def->id == id && def->en == en){
                 char *writer_pos = buffer->write_begin;
 
                 ret_code = fn(buffer, &iter_mul_f.field);
@@ -772,14 +770,23 @@ multi_fields (const struct fds_drec *rec, struct context *buffer,
                     // Other erros -> completly out
                     return ret_code;
                 }
-
-                ret_code = buffer_append(buffer, ((iter_mul_f.field.info->flags | FDS_TFIELD_LAST_IE) == 0) ? "," : "]");
+/*
+                ret_code = buffer_append(buffer, ((iter_mul_f.field.info->flags & FDS_TFIELD_LAST_IE) == 0) ? "," : "]");
                 if (ret_code != FDS_OK){
                     return ret_code;
                 }
-            } else {
-                continue;
-            }
+*/
+                if ((iter_mul_f.field.info->flags & FDS_TFIELD_LAST_IE) == 0){
+                    ret_code = buffer_append(buffer, "," );
+                    if (ret_code != FDS_OK){
+                        return ret_code;
+                    }
+                } else {
+                    ret_code = buffer_append(buffer, "]");
+                    if (ret_code != FDS_OK){
+                        return ret_code;
+                    }
+                }
         } else {
             continue;
         }
@@ -830,7 +837,7 @@ fds_drec2json(const struct fds_drec *rec, uint32_t flags, char **str,
           FDS_TFIELD_LAST_IE -> continue
          ale kdyz ma nastaveni
          */
-        if ((iter.field.info->flags | FDS_TFIELD_MULTI_IE) == 1 && (iter.field.info->flags | FDS_TFIELD_LAST_IE) == 0){
+        if ((iter.field.info->flags & FDS_TFIELD_MULTI_IE) != 0 && (iter.field.info->flags & FDS_TFIELD_LAST_IE) == 0){
             continue;
         }
 
@@ -865,7 +872,7 @@ fds_drec2json(const struct fds_drec *rec, uint32_t flags, char **str,
         }
 
         // If nesesary, call function for write multi fields
-        if ((iter.field.info->flags | FDS_TFIELD_MULTI_IE) == 1 && (iter.field.info->flags | FDS_TFIELD_LAST_IE) == 1){
+        if ((iter.field.info->flags & FDS_TFIELD_MULTI_IE) != 0 && (iter.field.info->flags | FDS_TFIELD_LAST_IE) != 0){
            ret_code = multi_fields(rec, &record, fn, def->id, def->en);
            if (ret_code != FDS_OK){
                return ret_code;
@@ -900,6 +907,7 @@ fds_drec2json(const struct fds_drec *rec, uint32_t flags, char **str,
     }
 
     //update value of \p str_size
+    *str = record.buffer_begin;
     *str_size = buffer_alloc(&record);
 
     buffer_append(&record,"}\n"); // This also adds '\0'
