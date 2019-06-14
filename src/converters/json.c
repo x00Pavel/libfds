@@ -737,13 +737,14 @@ int
 multi_fields (const struct fds_drec *rec, struct context *buffer,
     converter_fn fn, uint32_t en, uint16_t id)
 {
-    // inicializatio of iterator
+    // inicialization of iterator
     uint16_t iter_flag = (buffer->flags & FDS_CD2J_IGNORE_UNKNOWN) ? FDS_DREC_UNKNOWN_SKIP : 0;
-
     struct fds_drec_iter iter_mul_f;
     fds_drec_iter_init(&iter_mul_f, (struct fds_drec *) rec, iter_flag);
 
+    // multi fields must be like "enXX:idYY":[value, value...]
     int ret_code;
+    // append "["
     ret_code = buffer_append(buffer,"[");
     if (ret_code != FDS_OK){
         return ret_code;
@@ -752,9 +753,8 @@ multi_fields (const struct fds_drec *rec, struct context *buffer,
     // looking for multi fields
     while (fds_drec_iter_next(&iter_mul_f) != FDS_EOC) {
         const struct fds_tfield *def = iter_mul_f.field.info;
-        if ((iter_mul_f.field.info->flags & FDS_TFIELD_MULTI_IE) != 0 && def->id == id && def->en == en){
+        if (((iter_mul_f.field.info->flags & FDS_TFIELD_MULTI_IE) != 0) && (def->id == id) && (def->en == en)){
                 char *writer_pos = buffer->write_begin;
-
                 ret_code = fn(buffer, &iter_mul_f.field);
                 switch (ret_code) {
                 // Recover from a conversion error
@@ -765,27 +765,22 @@ multi_fields (const struct fds_drec *rec, struct context *buffer,
                         return ret_code;
                     }
                 case FDS_OK:
+                    if ((iter_mul_f.field.info->flags & FDS_TFIELD_LAST_IE) != 0){
+                        ret_code = buffer_append(buffer, "]" );
+                        if (ret_code != FDS_OK){
+                            return ret_code;
+                        }
+                        return FDS_OK;
+                    } else {
+                        ret_code = buffer_append(buffer, ",");
+                        if (ret_code != FDS_OK){
+                            return ret_code;
+                        }
+                    }
                     continue;
                 default:
                     // Other erros -> completly out
                     return ret_code;
-                }
-/*
-                ret_code = buffer_append(buffer, ((iter_mul_f.field.info->flags & FDS_TFIELD_LAST_IE) == 0) ? "," : "]");
-                if (ret_code != FDS_OK){
-                    return ret_code;
-                }
-*/
-                if ((iter_mul_f.field.info->flags & FDS_TFIELD_LAST_IE) == 0){
-                    ret_code = buffer_append(buffer, "," );
-                    if (ret_code != FDS_OK){
-                        return ret_code;
-                    }
-                } else {
-                    ret_code = buffer_append(buffer, "]");
-                    if (ret_code != FDS_OK){
-                        return ret_code;
-                    }
                 }
         } else {
             continue;
@@ -833,10 +828,8 @@ fds_drec2json(const struct fds_drec *rec, uint32_t flags, char **str,
     fds_drec_iter_init(&iter, (struct fds_drec *) rec, iter_flag);
 
     while (fds_drec_iter_next(&iter) != FDS_EOC) {
-        /*controla flagu MULTI_IE a zaroven neni nastaveni
-          FDS_TFIELD_LAST_IE -> continue
-         ale kdyz ma nastaveni
-         */
+        // if flag of multi fields is set,
+        // then this field will be skiped and processed later
         if ((iter.field.info->flags & FDS_TFIELD_MULTI_IE) != 0 && (iter.field.info->flags & FDS_TFIELD_LAST_IE) == 0){
             continue;
         }
@@ -872,16 +865,19 @@ fds_drec2json(const struct fds_drec *rec, uint32_t flags, char **str,
         }
 
         // If nesesary, call function for write multi fields
-        if ((iter.field.info->flags & FDS_TFIELD_MULTI_IE) != 0 && (iter.field.info->flags | FDS_TFIELD_LAST_IE) != 0){
-           ret_code = multi_fields(rec, &record, fn, def->id, def->en);
+        if ((iter.field.info->flags & FDS_TFIELD_MULTI_IE) != 0 && (iter.field.info->flags & FDS_TFIELD_LAST_IE) != 0){
+           ret_code = multi_fields(rec, &record, fn, def->en, def->id);
            if (ret_code != FDS_OK){
+               free(str);
                return ret_code;
            }
+           continue;
         }
 
         // Convert the field
         char *writer_pos = record.write_begin;
         ret_code = fn(&record, &iter.field);
+
 
         switch (ret_code) {
         // Recover from a conversion error
