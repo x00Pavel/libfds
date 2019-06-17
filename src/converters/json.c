@@ -753,42 +753,47 @@ multi_fields (const struct fds_drec *rec, struct context *buffer,
     // looking for multi fields
     while (fds_drec_iter_next(&iter_mul_f) != FDS_EOC) {
         const struct fds_tfield *def = iter_mul_f.field.info;
-        if (((iter_mul_f.field.info->flags & FDS_TFIELD_MULTI_IE) != 0) && (def->id == id) && (def->en == en)){
-                char *writer_pos = buffer->write_begin;
-                ret_code = fn(buffer, &iter_mul_f.field);
-                switch (ret_code) {
-                // Recover from a conversion error
-                case FDS_ERR_ARG:
-                    buffer->write_begin = writer_pos;
-                    ret_code = buffer_append(buffer, "null");
-                    if (ret_code != FDS_OK){
-                        return ret_code;
-                    }
-                case FDS_OK:
-                    if ((iter_mul_f.field.info->flags & FDS_TFIELD_LAST_IE) != 0){
-                        ret_code = buffer_append(buffer, "]" );
-                        if (ret_code != FDS_OK){
-                            return ret_code;
-                        }
-                        return FDS_OK;
-                    } else {
-                        ret_code = buffer_append(buffer, ",");
-                        if (ret_code != FDS_OK){
-                            return ret_code;
-                        }
-                    }
-                    continue;
-                default:
-                    // Other erros -> completly out
-                    return ret_code;
-                }
+        char *writer_pos = buffer->write_begin;
+
+        // check for simular ID and enterprise number
+        if ((def->id == id) && (def->en == en)){
+            ret_code = fn(buffer, &iter_mul_f.field);
         } else {
             continue;
         }
+
+        switch (ret_code) {
+            // Recover from a conversion error
+            case FDS_ERR_ARG:
+                buffer->write_begin = writer_pos;
+                ret_code = buffer_append(buffer, "null");
+                if (ret_code != FDS_OK){
+                    return ret_code;
+                }
+            case FDS_OK:
+                if (def->flags & FDS_TFIELD_LAST_IE){
+                    break;
+                } else {
+                    ret_code = buffer_append(buffer, ",");
+                    if (ret_code != FDS_OK){
+                        return ret_code;
+                    }
+                    continue;
+                }
+            default:
+                // Other erros -> completly out
+                return ret_code;
+            }
+    }
+
+    ret_code = buffer_append(buffer, "]" );
+    if (ret_code != FDS_OK){
+        return ret_code;
     }
 
     return FDS_OK;
 }
+
 int
 fds_drec2json(const struct fds_drec *rec, uint32_t flags, char **str,
     size_t *str_size)
@@ -819,7 +824,7 @@ fds_drec2json(const struct fds_drec *rec, uint32_t flags, char **str,
     unsigned int added = 0;
     int ret_code = buffer_append(&record,"{\"@type\":\"ipfix.entry\",");
     if (ret_code != FDS_OK){
-        return ret_code;
+        goto error;
     }
     // Try to convert each field in the record
     uint16_t iter_flag = (record.flags & FDS_CD2J_IGNORE_UNKNOWN) ? FDS_DREC_UNKNOWN_SKIP : 0;
@@ -830,7 +835,8 @@ fds_drec2json(const struct fds_drec *rec, uint32_t flags, char **str,
     while (fds_drec_iter_next(&iter) != FDS_EOC) {
         // if flag of multi fields is set,
         // then this field will be skiped and processed later
-        if ((iter.field.info->flags & FDS_TFIELD_MULTI_IE) != 0 && (iter.field.info->flags & FDS_TFIELD_LAST_IE) == 0){
+        const fds_template_flag_t field_flags = iter.field.info->flags;
+        if ((field_flags & FDS_TFIELD_MULTI_IE) != 0 && (field_flags & FDS_TFIELD_LAST_IE) == 0){
             continue;
         }
 
@@ -839,14 +845,14 @@ fds_drec2json(const struct fds_drec *rec, uint32_t flags, char **str,
             // Add comma
             ret_code = buffer_append(&record,",");
             if (ret_code != FDS_OK){
-                return ret_code;
+                goto error;
             }
         }
 
         // Add field name "<pen>:<field_name>"
         ret_code = add_field_name(&record, &iter.field);
         if (ret_code != FDS_OK){
-            return ret_code;
+            goto error;
         }
 
         // Find a converter
@@ -868,8 +874,7 @@ fds_drec2json(const struct fds_drec *rec, uint32_t flags, char **str,
         if ((iter.field.info->flags & FDS_TFIELD_MULTI_IE) != 0 && (iter.field.info->flags & FDS_TFIELD_LAST_IE) != 0){
            ret_code = multi_fields(rec, &record, fn, def->en, def->id);
            if (ret_code != FDS_OK){
-               free(str);
-               return ret_code;
+               goto error;
            }
            continue;
         }
@@ -885,20 +890,14 @@ fds_drec2json(const struct fds_drec *rec, uint32_t flags, char **str,
             record.write_begin = writer_pos;
             ret_code = buffer_append(&record, "null");
             if (ret_code != FDS_OK){
-                if (null_buffer){
-                    free(str);
-                }
-                return ret_code;
+                goto error;
             }
         case FDS_OK:
             added++;
             continue;
         default:
             // Other erros -> completly out
-            if (null_buffer){
-                free(str);
-            }
-            return ret_code;
+            goto error;
         }
     }
 
@@ -908,4 +907,10 @@ fds_drec2json(const struct fds_drec *rec, uint32_t flags, char **str,
 
     buffer_append(&record,"}\n"); // This also adds '\0'
     return buffer_used(&record);
+
+error:;
+    if (null_buffer){
+        free(str);
+    }
+    return ret_code;
 }
