@@ -756,11 +756,10 @@ multi_fields (const struct fds_drec *rec, struct context *buffer,
         char *writer_pos = buffer->write_begin;
 
         // check for simular ID and enterprise number
-        if ((def->id == id) && (def->en == en)){
-            ret_code = fn(buffer, &iter_mul_f.field);
-        } else {
+        if (def->id != id || def->en != en){
             continue;
         }
+        ret_code = fn(buffer, &iter_mul_f.field);
 
         switch (ret_code) {
             // Recover from a conversion error
@@ -771,21 +770,27 @@ multi_fields (const struct fds_drec *rec, struct context *buffer,
                     return ret_code;
                 }
             case FDS_OK:
-                if (def->flags & FDS_TFIELD_LAST_IE){
-                    break;
-                } else {
-                    ret_code = buffer_append(buffer, ",");
-                    if (ret_code != FDS_OK){
-                        return ret_code;
-                    }
-                    continue;
-                }
+                break;
             default:
                 // Other erros -> completly out
                 return ret_code;
             }
+
+            // if it last field, then go out from loop
+            if (def->flags & FDS_TFIELD_LAST_IE){
+                break;
+            }
+
+            // otherwise add "," and continue
+            ret_code = buffer_append(buffer, ",");
+            if (ret_code != FDS_OK){
+                return ret_code;
+            }
+            continue;
+
     }
 
+    // add "]" in the end if trehe are no more fields with same ID or EN
     ret_code = buffer_append(buffer, "]" );
     if (ret_code != FDS_OK){
         return ret_code;
@@ -871,7 +876,7 @@ fds_drec2json(const struct fds_drec *rec, uint32_t flags, char **str,
         }
 
         // If nesesary, call function for write multi fields
-        if ((iter.field.info->flags & FDS_TFIELD_MULTI_IE) != 0 && (iter.field.info->flags & FDS_TFIELD_LAST_IE) != 0){
+        if ((field_flags & FDS_TFIELD_MULTI_IE) != 0 && (field_flags & FDS_TFIELD_LAST_IE) != 0){
            ret_code = multi_fields(rec, &record, fn, def->en, def->id);
            if (ret_code != FDS_OK){
                goto error;
