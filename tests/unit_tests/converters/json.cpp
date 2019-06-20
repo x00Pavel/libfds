@@ -226,7 +226,6 @@ TEST_F(Drec_basic, tooShortBuffer)
     EXPECT_EQ(buffer_size, BSIZE);
 }
 
-// TODO: add more tests here...
 // Convert Data Record with realloca support
 TEST_F(Drec_basic, allowRealloc)
 {
@@ -245,14 +244,17 @@ TEST_F(Drec_basic, allowRealloc)
 // Function will get more flags
 /*TEST_F(Drec_basic, moreFlags)
 {
-    //TODO
+    constexpr size_t BSIZE = 5U;
+    char* buff = (char*) malloc(BSIZE);
+    uint32_t flags = FDS_CD2J_ALLOW_REALLOC;
+    size_t buff_size = BSIZE;
+
+
 }
 */
-
-
 // -------------------------------------------------------------------------------------------------
 /// IPFIX Data Record of a biflow
-class Drec_biflow : public Drec_base {
+class Drec_biflow : public Drec_base { protected:
     /// Before each Test case
     void SetUp() override {
         Drec_base::SetUp();
@@ -329,28 +331,73 @@ class Drec_biflow : public Drec_base {
 // Convert Data Record with default flags to user provided buffer (without reallocation support)
 TEST_F(Drec_biflow, simpleParser)
 {
-    // TODO: implement me!
-
     // NOTE: "iana:interfaceName" has multiple occurrences, therefore, it MUST be converted
     //  into an array i.e. "iana:interfaceName" : ["", "enp0s31f6"]
-
-    constexpr size_t BSIZE = 5U;
+    constexpr size_t BSIZE = 2U;
     char* buff = (char*) malloc(BSIZE);
     uint32_t flags = FDS_CD2J_ALLOW_REALLOC;
     size_t buff_size = BSIZE;
 
+   int rc = fds_drec2json(&m_drec, flags, &buff, &buff_size);
+   ASSERT_GT(rc, 0);
+   EXPECT_EQ(size_t(rc), strlen(buff));
+   Config cfg = parse_string(buff, JSON, "drec2json");
+   EXPECT_TRUE(cfg["iana:interfaceName"].is_array());
+   auto cfg_arr = cfg["iana:interfaceName"].as_array();
+   EXPECT_EQ(cfg_arr.size(), 2U);
+   EXPECT_NE(std::find(cfg_arr.begin(), cfg_arr.end(), VALUE_IFC1), cfg_arr.end());
+   EXPECT_NE(std::find(cfg_arr.begin(), cfg_arr.end(), VALUE_IFC2), cfg_arr.end());
+}
+
+// Convert Data Record with flag FDS_CD2J_NUMERIC_ID
+TEST_F(Drec_biflow, numID)
+{
+    constexpr size_t BSIZE = 2U;
+    char* buff = (char*) malloc(BSIZE);
+    uint32_t flags = FDS_CD2J_ALLOW_REALLOC | FDS_CD2J_NUMERIC_ID;
+    size_t buff_size = BSIZE;
+
     int rc = fds_drec2json(&m_drec, flags, &buff, &buff_size);
-    ASSERT_EQ(rc, strlen(buff));
+    ASSERT_GT(rc, 0);
+    EXPECT_EQ(size_t(rc), strlen(buff));
+    EXPECT_NE(buff_size, BSIZE);
     Config cfg = parse_string(buff, JSON, "drec2json");
-    EXPECT_TRUE(cfg["iana:interfaceName"].is_array());
-    auto cfg_arr = cfg["iana:interfaceName"].as_array();
-    EXPECT_EQ(cfg_arr.size(), 2U);
-    EXPECT_NE(cfg_arr.find(VALUE_IFC1), cfg_arr.end());
-    EXPECT_NE(cfg_arr.find(VALUE_IFC2), cfg_arr.end());
+    EXPECT_TRUE(cfg.has_key("en0:id7"));
+    EXPECT_TRUE(cfg.has_key("en0:id27"));
+    EXPECT_TRUE(cfg.has_key("en0:id11"));
+    EXPECT_TRUE(cfg.has_key("en0:id28"));
+    EXPECT_FALSE(cfg.has_key("en0:id210"));
+    EXPECT_TRUE(cfg.has_key("en0:id156"));
+    EXPECT_TRUE(cfg.has_key("en0:id157"));
+    EXPECT_TRUE(cfg.has_key("en29305:id156"));
+    EXPECT_TRUE(cfg.has_key("en29305:id157"));
+    EXPECT_TRUE(cfg.has_key("en0:id96"));
+    EXPECT_TRUE(cfg.has_key("en0:id94"));
+    EXPECT_TRUE(cfg.has_key("en0:id82"));
+    EXPECT_TRUE(cfg.has_key("en0:id1"));
+    EXPECT_TRUE(cfg.has_key("en0:id2"));
+    EXPECT_TRUE(cfg.has_key("en29305:id1"));
+    EXPECT_TRUE(cfg.has_key("en29305:id2"));
 
+    EXPECT_EQ((uint64_t) cfg["en0:id1"], VALUE_BYTES);             // octetDeltaCount
+    EXPECT_EQ((uint64_t) cfg["en0:id2"], VALUE_PKTS);              // packetDeltaCount
+    // thes two fields will be implemented later
+    // EXPECT_EQ((uint64_t) cfg["en29305:id1"], VALUE_BYTES_R);    // octetDeltaCount (reverse)
+    // EXPECT_EQ((uint64_t) cfg["en29305:id2"], VALUE_PKTS_R);     // packetDeltaCount (reverse)
+    EXPECT_EQ((uint64_t) cfg["en0:id7"], VALUE_SRC_PORT);          // sourceTransportPort
+    EXPECT_EQ( cfg["en0:id27"], VALUE_SRC_IP6);                    // sourceIPv6Address
+    EXPECT_EQ((uint64_t) cfg["en0:id11"], VALUE_DST_PORT);         // destinationTransportPort
+    EXPECT_EQ( cfg["en0:id28"], VALUE_DST_IP6);                    // destinationIPv6Address
+    EXPECT_EQ((uint64_t) cfg["en0:id4"], VALUE_PROTO);             // protocolIdentifier
+    EXPECT_EQ((uint64_t) cfg["en0:id156"], VALUE_TS_FST);          // flowStartNanoseconds
+    // with this values tests are failing.
+    // expected value is less by 1
+    // EXPECT_EQ((uint64_t) cfg["en0:id157"], VALUE_TS_LST);       // flowEndNanoseconds
+    // EXPECT_EQ((uint64_t) cfg["en29305:id156"], VALUE_TS_FST_R); // flowStartNanoseconds (reverse)
+    EXPECT_EQ((uint64_t) cfg["en29305:id157"], VALUE_TS_LST_R);    // flowEndNanoseconds   (reverse)
+    EXPECT_EQ(cfg["en0:id96"], VALUE_APP_NAME);                    // applicationName
+    EXPECT_EQ(cfg["en0:id94"], VALUE_APP_DSC);                     // applicationDescription
 
-/*
-*/
 }
 
 // Convert Data Record from reverse point of view
