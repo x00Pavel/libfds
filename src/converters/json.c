@@ -226,7 +226,7 @@ to_octet(struct context *buffer, const struct fds_drec_field *field)
 int
 to_float(struct context *buffer, const struct fds_drec_field *field)
 {
-    // We cannot use default function because "nan" and "infinity" values
+    // We can not use default function because of "NAN" and "infinity" values
     double value;
     if (fds_get_float_be(field->data, field->size, &value) != FDS_OK) {
         return FDS_ERR_ARG;
@@ -684,12 +684,16 @@ int
 add_field_name(struct context *buffer, const struct fds_drec_field *field)
 {
     const struct fds_iemgr_elem *def = field->info->def;
+    bool num_id = ((buffer->flags & FDS_CD2J_NUMERIC_ID) != 0);
 
-    if (def == NULL) {
+    // If defenition of field is unknown or if flag FDS_CD2J_NUMERIC_ID is set,
+    // then identeficator will be in format "enXX:idYY"
+    if ((def == NULL) || (num_id)) {
         int scope_size = 32;
         char raw_name[scope_size];
 
-        // Unknown field - max length is "\"en" + 10x <en> + ":id" + 5x <id> + '\"\0'
+        // Max length of identeficator in format "enXX:idYY"
+        // is "\"en" + 10x <en> + ":id" + 5x <id> + '\"\0'
         snprintf(raw_name, scope_size, "\"en%" PRIu32 ":id%" PRIu16 "\":", field->info->en,
             field->info->id);
 
@@ -699,7 +703,6 @@ add_field_name(struct context *buffer, const struct fds_drec_field *field)
         }
         return FDS_OK;
     }
-
     const size_t scope_size = strlen(def->scope->name);
     const size_t elem_size = strlen(def->name);
 
@@ -709,10 +712,12 @@ add_field_name(struct context *buffer, const struct fds_drec_field *field)
         return ret_code;
     }
     *(buffer->write_begin++) = '"';
+    // if flag FDS_CD2J_NUMERIC_ID is set, then add Enterprise number
     memcpy(buffer->write_begin, def->scope->name, scope_size);
     buffer->write_begin += scope_size;
 
     *(buffer->write_begin++) = ':';
+    // if flag FDS_CD2J_NUMERIC_ID is set, then add ID od element
     memcpy(buffer->write_begin, def->name, elem_size);
     buffer->write_begin += elem_size;
     *(buffer->write_begin++) = '"';
@@ -762,32 +767,31 @@ multi_fields (const struct fds_drec *rec, struct context *buffer,
         ret_code = fn(buffer, &iter_mul_f.field);
 
         switch (ret_code) {
-            // Recover from a conversion error
-            case FDS_ERR_ARG:
-                buffer->write_begin = writer_pos;
-                ret_code = buffer_append(buffer, "null");
-                if (ret_code != FDS_OK){
-                    return ret_code;
-                }
-            case FDS_OK:
-                break;
-            default:
-                // Other erros -> completly out
-                return ret_code;
-            }
-
-            // if it last field, then go out from loop
-            if (def->flags & FDS_TFIELD_LAST_IE){
-                break;
-            }
-
-            // otherwise add "," and continue
-            ret_code = buffer_append(buffer, ",");
+        // Recover from a conversion error
+        case FDS_ERR_ARG:
+            buffer->write_begin = writer_pos;
+            ret_code = buffer_append(buffer, "null");
             if (ret_code != FDS_OK){
                 return ret_code;
             }
-            continue;
+        case FDS_OK:
+            break;
+        default:
+           // Other erros -> completly out
+           return ret_code;
+        }
 
+        // if it last field, then go out from loop
+        if (def->flags & FDS_TFIELD_LAST_IE){
+            break;
+        }
+
+        // otherwise add "," and continue
+        ret_code = buffer_append(buffer, ",");
+        if (ret_code != FDS_OK){
+            return ret_code;
+        }
+        continue;
     }
 
     // add "]" in the end if trehe are no more fields with same ID or EN
@@ -827,7 +831,9 @@ fds_drec2json(const struct fds_drec *rec, uint32_t flags, char **str,
 
     converter_fn fn;
     unsigned int added = 0;
-    int ret_code = buffer_append(&record,"{\"@type\":\"ipfix.entry\",");
+    int ret_code;
+
+    ret_code = buffer_append(&record,"{\"@type\":\"ipfix.entry\",");
     if (ret_code != FDS_OK){
         goto error;
     }
@@ -838,7 +844,7 @@ fds_drec2json(const struct fds_drec *rec, uint32_t flags, char **str,
     fds_drec_iter_init(&iter, (struct fds_drec *) rec, iter_flag);
 
     while (fds_drec_iter_next(&iter) != FDS_EOC) {
-        // if flag of multi fields is set,
+        // If flag of multi fields is set,
         // then this field will be skiped and processed later
         const fds_template_flag_t field_flags = iter.field.info->flags;
         if ((field_flags & FDS_TFIELD_MULTI_IE) != 0 && (field_flags & FDS_TFIELD_LAST_IE) == 0){
