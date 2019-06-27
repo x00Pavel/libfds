@@ -712,12 +712,10 @@ add_field_name(struct context *buffer, const struct fds_drec_field *field)
         return ret_code;
     }
     *(buffer->write_begin++) = '"';
-    // if flag FDS_CD2J_NUMERIC_ID is set, then add Enterprise number
     memcpy(buffer->write_begin, def->scope->name, scope_size);
     buffer->write_begin += scope_size;
 
     *(buffer->write_begin++) = ':';
-    // if flag FDS_CD2J_NUMERIC_ID is set, then add ID od element
     memcpy(buffer->write_begin, def->name, elem_size);
     buffer->write_begin += elem_size;
     *(buffer->write_begin++) = '"';
@@ -744,6 +742,8 @@ multi_fields (const struct fds_drec *rec, struct context *buffer,
 {
     // inicialization of iterator
     uint16_t iter_flag = (buffer->flags & FDS_CD2J_IGNORE_UNKNOWN) ? FDS_DREC_UNKNOWN_SKIP : 0;
+    iter_flag |= (buffer->flags & FDS_CD2J_BIFLOW_REVERSE) ? FDS_DREC_BIFLOW_REV : 0;
+
     struct fds_drec_iter iter_mul_f;
     fds_drec_iter_init(&iter_mul_f, (struct fds_drec *) rec, iter_flag);
 
@@ -840,6 +840,10 @@ fds_drec2json(const struct fds_drec *rec, uint32_t flags, char **str,
     // Try to convert each field in the record
     uint16_t iter_flag = (record.flags & FDS_CD2J_IGNORE_UNKNOWN) ? FDS_DREC_UNKNOWN_SKIP : 0;
 
+    // If flag FDS_CD2J_BIFLOW_REVERSE is set,
+    // then will be added flag FDS_DREC_BIFLOW_REV for every field
+    iter_flag |= (record.flags & FDS_CD2J_BIFLOW_REVERSE) ? FDS_DREC_BIFLOW_REV : 0;
+
     struct fds_drec_iter iter;
     fds_drec_iter_init(&iter, (struct fds_drec *) rec, iter_flag);
 
@@ -916,7 +920,11 @@ fds_drec2json(const struct fds_drec *rec, uint32_t flags, char **str,
     *str = record.buffer_begin;
     *str_size = buffer_alloc(&record);
 
-    buffer_append(&record,"}\n"); // This also adds '\0'
+    ret_code = buffer_append(&record,"}\n"); // This also adds '\0'
+    if(ret_code != FDS_OK){
+        goto error;
+    }
+
     return buffer_used(&record);
 
 error:;
