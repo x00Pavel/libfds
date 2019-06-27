@@ -238,20 +238,9 @@ TEST_F(Drec_basic, allowRealloc)
     ASSERT_GT(rc, 0);
     EXPECT_EQ(size_t(rc), strlen(buff));
     EXPECT_NE(buff_size, BSIZE);
-
+    free(buff);
 }
 
-// Function will get more flags
-/*TEST_F(Drec_basic, moreFlags)
-{
-    constexpr size_t BSIZE = 5U;
-    char* buff = (char*) malloc(BSIZE);
-    uint32_t flags = FDS_CD2J_ALLOW_REALLOC;
-    size_t buff_size = BSIZE;
-
-
-}
-*/
 // -------------------------------------------------------------------------------------------------
 /// IPFIX Data Record of a biflow
 class Drec_biflow : public Drec_base { protected:
@@ -314,8 +303,8 @@ class Drec_biflow : public Drec_base { protected:
     uint16_t    VALUE_DST_PORT = 8754;
     uint8_t     VALUE_PROTO    = 17; // UDP
     uint64_t    VALUE_TS_FST   = 1522670362000ULL;
-    uint64_t    VALUE_TS_LST   = 1522670372999ULL;
-    uint64_t    VALUE_TS_FST_R = 1522670363123ULL;
+    uint64_t    VALUE_TS_LST   = 1522670373000ULL;
+    uint64_t    VALUE_TS_FST_R = 1522670364000ULL;
     uint64_t    VALUE_TS_LST_R = 1522670369000ULL;
     std::string VALUE_APP_NAME = "firefox";
     std::string VALUE_APP_DSC  = "linux/web browser";
@@ -347,6 +336,7 @@ TEST_F(Drec_biflow, simpleParser)
    EXPECT_EQ(cfg_arr.size(), 2U);
    EXPECT_NE(std::find(cfg_arr.begin(), cfg_arr.end(), VALUE_IFC1), cfg_arr.end());
    EXPECT_NE(std::find(cfg_arr.begin(), cfg_arr.end(), VALUE_IFC2), cfg_arr.end());
+   free(buff);
 }
 
 // Convert Data Record with flag FDS_CD2J_NUMERIC_ID
@@ -379,29 +369,104 @@ TEST_F(Drec_biflow, numID)
     EXPECT_TRUE(cfg.has_key("en29305:id1"));
     EXPECT_TRUE(cfg.has_key("en29305:id2"));
 
-    EXPECT_EQ((uint64_t) cfg["en0:id1"], VALUE_BYTES);             // octetDeltaCount
-    EXPECT_EQ((uint64_t) cfg["en0:id2"], VALUE_PKTS);              // packetDeltaCount
-    // thes two fields will be implemented later
-    // EXPECT_EQ((uint64_t) cfg["en29305:id1"], VALUE_BYTES_R);    // octetDeltaCount (reverse)
-    // EXPECT_EQ((uint64_t) cfg["en29305:id2"], VALUE_PKTS_R);     // packetDeltaCount (reverse)
-    EXPECT_EQ((uint64_t) cfg["en0:id7"], VALUE_SRC_PORT);          // sourceTransportPort
-    EXPECT_EQ( cfg["en0:id27"], VALUE_SRC_IP6);                    // sourceIPv6Address
-    EXPECT_EQ((uint64_t) cfg["en0:id11"], VALUE_DST_PORT);         // destinationTransportPort
-    EXPECT_EQ( cfg["en0:id28"], VALUE_DST_IP6);                    // destinationIPv6Address
-    EXPECT_EQ((uint64_t) cfg["en0:id4"], VALUE_PROTO);             // protocolIdentifier
-    EXPECT_EQ((uint64_t) cfg["en0:id156"], VALUE_TS_FST);          // flowStartNanoseconds
-    // with this values tests are failing.
-    // expected value is less by 1
-    // EXPECT_EQ((uint64_t) cfg["en0:id157"], VALUE_TS_LST);       // flowEndNanoseconds
-    // EXPECT_EQ((uint64_t) cfg["en29305:id156"], VALUE_TS_FST_R); // flowStartNanoseconds (reverse)
-    EXPECT_EQ((uint64_t) cfg["en29305:id157"], VALUE_TS_LST_R);    // flowEndNanoseconds   (reverse)
-    EXPECT_EQ(cfg["en0:id96"], VALUE_APP_NAME);                    // applicationName
-    EXPECT_EQ(cfg["en0:id94"], VALUE_APP_DSC);                     // applicationDescription
-
+    EXPECT_EQ((uint64_t) cfg["en0:id1"], VALUE_BYTES);     // octetDeltaCount
+    EXPECT_EQ((uint64_t) cfg["en0:id2"], VALUE_PKTS);      // packetDeltaCount
+    EXPECT_EQ((uint64_t) cfg["en0:id7"], VALUE_SRC_PORT);  // sourceTransportPort
+    EXPECT_EQ( cfg["en0:id27"], VALUE_SRC_IP6);            // sourceIPv6Address
+    EXPECT_EQ((uint64_t) cfg["en0:id11"], VALUE_DST_PORT); // destinationTransportPort
+    EXPECT_EQ( cfg["en0:id28"], VALUE_DST_IP6);            // destinationIPv6Address
+    EXPECT_EQ((uint64_t) cfg["en0:id4"], VALUE_PROTO);     // protocolIdentifier
+    EXPECT_EQ((uint64_t) cfg["en0:id156"], VALUE_TS_FST);  // flowStartNanoseconds
+    EXPECT_EQ((uint64_t) cfg["en0:id157"], VALUE_TS_LST);  // flowEndNanoseconds
+    EXPECT_EQ(cfg["en0:id96"], VALUE_APP_NAME);            // applicationName
+    EXPECT_EQ(cfg["en0:id94"], VALUE_APP_DSC);             // applicationDescription
+    free(buff);
 }
 
 // Convert Data Record from reverse point of view
 TEST_F(Drec_biflow, reverseView)
 {
-    // TODO: implement me!
+    constexpr size_t BSIZE = 2U;
+    char* buff = (char*) malloc(BSIZE);
+    uint32_t flags = FDS_CD2J_ALLOW_REALLOC | FDS_CD2J_NUMERIC_ID | FDS_CD2J_BIFLOW_REVERSE;
+    size_t buff_size = BSIZE;
+
+    int rc = fds_drec2json(&m_drec, flags, &buff, &buff_size);
+    ASSERT_GT(rc, 0);
+    EXPECT_EQ(size_t(rc), strlen(buff));
+    EXPECT_NE(buff_size, BSIZE);
+    Config cfg = parse_string(buff, JSON, "drec2json");
+
+    EXPECT_EQ((uint64_t) cfg["en0:id1"], VALUE_BYTES_R);     // octetDeltaCount (reverse)
+    EXPECT_EQ((uint64_t) cfg["en0:id2"], VALUE_PKTS_R);      // packetDeltaCount (reverse)
+    EXPECT_EQ((uint64_t) cfg["en0:id156"], VALUE_TS_FST_R);  // flowStartNanoseconds (reverse)
+    EXPECT_EQ((uint64_t) cfg["en0:id157"], VALUE_TS_LST_R);  // flowEndNanoseconds   (reverse)
+    free(buff);
 }
+// Testing return of error code FDS_ERR_BUFFER
+TEST_F(Drec_biflow, errorBuff)
+{
+    // Default situation
+    constexpr size_t BSIZE = 0U;
+    char* def_buff = (char*) malloc(BSIZE);
+    uint32_t def_flags = FDS_CD2J_ALLOW_REALLOC;
+    size_t def_buff_size = BSIZE;
+
+    int def_rc = fds_drec2json(&m_drec, def_flags, &def_buff, &def_buff_size);
+    ASSERT_GT(def_rc, 0);
+    EXPECT_EQ(size_t(def_rc), strlen(def_buff));
+    EXPECT_NE(def_buff_size, BSIZE);
+    free(def_buff);
+    // Loop check error situations
+    for (int i = 0; i < def_rc; i++){
+        char*  new_buff= (char*) malloc(i);
+        uint32_t new_flags = 0;
+        size_t new_buff_size = i;
+        int new_rc = fds_drec2json(&m_drec, new_flags, &new_buff, &new_buff_size);
+        EXPECT_EQ(new_rc, FDS_ERR_BUFFER);
+        free(new_buff);
+    }
+}
+
+// Test for time fromat (FDS_CD2J_TS_FORMAT_MSEC)
+TEST_F(Drec_biflow, timeFormat)
+{
+    constexpr size_t BSIZE = 0U;
+    size_t buff_size = BSIZE;
+    char* buff = NULL;
+    uint32_t flags = FDS_CD2J_TS_FORMAT_MSEC;
+
+    int rc = fds_drec2json(&m_drec, flags, &buff, &buff_size);
+    ASSERT_GT(rc, 0);
+    Config cfg = parse_string(buff, JSON, "drec2json");
+    EXPECT_EQ( cfg["iana:flowStartNanoseconds"], "2018-04-02T11:59:22.000Z");
+    EXPECT_EQ( cfg["iana:flowEndNanoseconds"], "2018-04-02T11:59:33.000Z");
+    free (buff);
+}
+
+// Test for string format of protocol (FDS_CD2J_FORMAT_PROTO)
+TEST_F(Drec_biflow, protoFormat)
+{
+    constexpr size_t BSIZE = 2000U;
+    char* buff = (char*) malloc(BSIZE);
+    uint32_t flags = FDS_CD2J_FORMAT_PROTO;
+    size_t buff_size = BSIZE;
+
+    int rc = fds_drec2json(&m_drec, flags, &buff, &buff_size);
+    ASSERT_GT(rc, 0);
+    Config cfg = parse_string(buff, JSON, "drec2json");
+    EXPECT_EQ( cfg["iana:protocolIdentifier"], "UDP");
+
+    free(buff);
+}
+// FDS_CD2J_NON_PRINTABLE test
+
+/* TODO
+    Impliment falg FDS_CD2J_NON_PRINTABLE
+    To new class add:
+        field that must be converted to octet and its size greater then 8
+                                     to float
+                                     to bool
+                                     to flag
+                                     to mac
+*/
