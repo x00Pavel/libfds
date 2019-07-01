@@ -209,7 +209,6 @@ TEST_F(Drec_basic, defaultConverterWithAlloc)
     // Try to parse the JSON string and check values
     Config cfg;
     ASSERT_NO_THROW(cfg = parse_string(buffer, JSON, "drec2json"));
-    // TODO: implement me!
 
     free(buffer);
 }
@@ -428,7 +427,7 @@ TEST_F(Drec_biflow, errorBuff)
     }
 }
 
-// Test for time fromat (FDS_CD2J_TS_FORMAT_MSEC)
+// Test for time format (FDS_CD2J_TS_FORMAT_MSEC)
 TEST_F(Drec_biflow, timeFormat)
 {
     constexpr size_t BSIZE = 0U;
@@ -441,6 +440,7 @@ TEST_F(Drec_biflow, timeFormat)
     Config cfg = parse_string(buff, JSON, "drec2json");
     EXPECT_EQ( cfg["iana:flowStartNanoseconds"], "2018-04-02T11:59:22.000Z");
     EXPECT_EQ( cfg["iana:flowEndNanoseconds"], "2018-04-02T11:59:33.000Z");
+
     free (buff);
 }
 
@@ -459,14 +459,145 @@ TEST_F(Drec_biflow, protoFormat)
 
     free(buff);
 }
-// FDS_CD2J_NON_PRINTABLE test
+
+
+TEST_F(Drec_biflow, nonPrint)
+{
+    constexpr size_t BSIZE = 2000U;
+    char* buff = (char*) malloc(BSIZE);
+    uint32_t flags = FDS_CD2J_NON_PRINTABLE;
+    size_t buff_size = BSIZE;
+
+    int rc = fds_drec2json(&m_drec, flags, &buff, &buff_size);
+    ASSERT_GT(rc, 0);
+    Config cfg = parse_string(buff, JSON, "drec2json");
+
+    free(buff);
+}
+
+// -------------------------------------------------------------------------------------------------
+/// IPFIX Data Record for extra situations
+class Drec_extra : public Drec_base {
+protected:
+    /// Before each Test case
+    void SetUp() override {
+        Drec_base::SetUp();
+
+        // Prepare an IPFIX Template
+        ipfix_trec trec{256};
+        trec.add_field(  8, 4);             // sourceIPv4Address
+        trec.add_field( 12, 4);             // destinationIPv4Address
+        trec.add_field( 94, ipfix_trec::SIZE_VAR);             // applicationDescription (string)
+        trec.add_field(  7, 2);             // sourceTransportPort
+        trec.add_field( 11, 2);             // destinationTransportPort
+        trec.add_field(  4, 1);             // protocolIdentifier
+        trec.add_field(210, 3);             // -- paddingOctets
+        trec.add_field(152, 8);             // flowStartMilliseconds
+        trec.add_field(153, 8);             // flowEndMilliseconds
+        trec.add_field(  1, 8);             // octetDeltaCount
+        trec.add_field(  2, 8);             // packetDeltaCount
+        trec.add_field(100, 8, 10000);      // -- field with unknown definition --
+        trec.add_field(  6, 1);             // tcpControlBits
+        trec.add_field(1001,1);             // myBool
+        trec.add_field(1000,8);             // myFloat64
+        trec.add_field(1002,8);             // myInt
+        // trec.add_field(56, 6);              // sourceMacAddress
+
+        // Prepare an IPFIX Data Record
+        ipfix_drec drec{};
+        drec.append_ip(VALUE_SRC_IP4);
+        drec.append_ip(VALUE_DST_IP4);
+        drec.append_string(VALUE_APP_DES);
+        drec.append_uint(VALUE_SRC_PORT, 2);
+        drec.append_uint(VALUE_DST_PORT, 2);
+        drec.append_uint(VALUE_PROTO, 1);
+        drec.append_uint(0, 3); // Padding
+        drec.append_datetime(VALUE_TS_FST, FDS_ET_DATE_TIME_MILLISECONDS);
+        drec.append_datetime(VALUE_TS_LST, FDS_ET_DATE_TIME_MILLISECONDS);
+        drec.append_uint(VALUE_BYTES, 8);
+        drec.append_uint(VALUE_PKTS, 8);
+        drec.append_float(VALUE_UNKNOWN, 8);
+        drec.append_uint(VALUE_TCPBITS, 1);
+        drec.append_bool(VALUE_MY_BOOL);
+        drec.append_float(VALUE_MY_FLOAT, 8);
+        drec.append_int(VALUE_MY_INT,8);
+        // drec.append_mac(VALUE_SRC_MAC);
+
+        register_template(trec);
+        drec_create(256, drec);
+    }
+
+    std::string VALUE_SRC_IP4  = "127.0.0.1";
+    std::string VALUE_DST_IP4  = "8.8.8.8";
+    std::string VALUE_APP_DES  = "web\nclose\topen\x13";
+    uint16_t    VALUE_SRC_PORT = 65000;
+    uint16_t    VALUE_DST_PORT = 80;
+    uint8_t     VALUE_PROTO    = 6; // TCP
+    uint64_t    VALUE_TS_FST   = 1522670362000ULL;
+    uint64_t    VALUE_TS_LST   = 1522670372999ULL;
+    uint64_t    VALUE_BYTES    = 1234567;
+    uint64_t    VALUE_PKTS     = 12345;
+    double      VALUE_UNKNOWN  = 3.1416f;
+    uint8_t     VALUE_TCPBITS  = 0x13; // ACK, SYN, FIN
+    bool        VALUE_MY_BOOL  = true;
+    double      VALUE_MY_FLOAT = 0.1234;
+    signed      VALUE_MY_INT   = 1006;
+    // std::string VALUE_SRC_MAC   = "01:12:1f:13:11:8a";
+};
+
+// Test for diferent data types
+TEST_F(Drec_extra, testTypes)
+{
+    constexpr size_t BSIZE = 10U;
+    char* buff = (char*) malloc(BSIZE);
+    uint32_t flags = FDS_CD2J_ALLOW_REALLOC;
+    size_t buff_size = BSIZE;
+
+    int rc = fds_drec2json(&m_drec, flags, &buff, &buff_size);
+    ASSERT_GT(rc, 0);
+    Config cfg = parse_string(buff, JSON, "drec2json");
+    EXPECT_EQ((double)cfg["iana:myFloat"], VALUE_MY_FLOAT);
+    EXPECT_EQ(cfg["iana:myBool"], VALUE_MY_BOOL);
+    EXPECT_EQ((signed)cfg["iana:myInt"], VALUE_MY_INT);
+    // EXPECT_EQ(cfg["iana:sourceMacAddress"], VALUE_SRC_MAC);
+
+    free(buff);
+}
+
+// Test for non printable characters (FDS_CD2J_NON_PRINTABLE)
+TEST_F(Drec_extra, nonPrintable)
+{
+    constexpr size_t BSIZE = 10U;
+    char* buff = (char*) malloc(BSIZE);
+    uint32_t flags = FDS_CD2J_NON_PRINTABLE | FDS_CD2J_ALLOW_REALLOC;
+    size_t buff_size = BSIZE;
+
+    int rc = fds_drec2json(&m_drec, flags, &buff, &buff_size);
+    ASSERT_GT(rc, 0);
+    Config cfg = parse_string(buff, JSON, "drec2json");
+    EXPECT_EQ(cfg["iana:applicationDescription"], "webcloseopen");
+
+    free(buff);
+}
+
+// Test for eskaping characters
+TEST_F(Drec_extra, printableChar)
+{
+    constexpr size_t BSIZE = 10U;
+    char* buff = (char*) malloc(BSIZE);
+    uint32_t flags = FDS_CD2J_ALLOW_REALLOC;
+    size_t buff_size = BSIZE;
+
+    int rc = fds_drec2json(&m_drec, flags, &buff, &buff_size);
+    ASSERT_GT(rc, 0);
+    Config cfg = parse_string(buff, JSON, "drec2json");
+    // For conversion from JSON to C natation cares JSON parser
+    EXPECT_EQ((std::string)cfg["iana:applicationDescription"], VALUE_APP_DES);
+
+    free(buff);
+}
 
 /* TODO
-    Impliment falg FDS_CD2J_NON_PRINTABLE
-    To new class add:
-        field that must be converted to octet and its size greater then 8
-                                     to float
-                                     to bool
-                                     to flag
-                                     to mac
-*/
+    Test "to flag" (in Drec_basic using VALUE_TCPBITS)
+
+ */
