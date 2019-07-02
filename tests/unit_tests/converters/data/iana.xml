@@ -1069,6 +1069,28 @@ and will be lost when the list is regenerated.
         <status>current</status>
     </element>
 
+    <element>
+        <id>1004</id>
+        <name>myPInf</name>
+        <dataType>float64</dataType>
+        <dataSemantics>default</dataSemantics>
+        <status>current</status>
+    </element>
 
+    <element>
+        <id>1005</id>
+        <name>myMInf</name>
+        <dataType>float64</dataType>
+        <dataSemantics>default</dataSemantics>
+        <status>current</status>
+    </element>
+
+    <element>
+        <id>1006</id>
+        <name>myNan</name>
+        <dataType>float64</dataType>
+        <dataSemantics>default</dataSemantics>
+        <status>current</status>
+    </element>
 
 </ipfix-elements>
