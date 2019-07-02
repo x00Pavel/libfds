@@ -10,7 +10,7 @@
 
 #include <libfds.h>
 #include <stdexcept>
-
+#include <limits>
 #include <gtest/gtest.h>
 #include <MsgGen.h>
 
@@ -502,6 +502,9 @@ protected:
         trec.add_field(1000,8);             // myFloat64
         trec.add_field(1003,4);             // myFloat32
         trec.add_field(1002,8);             // myInt
+        trec.add_field(1004,8);             // myPInf
+        trec.add_field(1005,8);             // myMInf
+        trec.add_field(1006,8);             // myNan
 
         // trec.add_field(56, 6);              // sourceMacAddress
 
@@ -524,6 +527,9 @@ protected:
         drec.append_float(VALUE_MY_FLOAT64, 8);
         drec.append_float(VALUE_MY_FLOAT32, 4);
         drec.append_int(VALUE_MY_INT,8);
+        drec.append_float(VALUE_MY_PINF,8);
+        drec.append_float(VALUE_MY_MINF,8);
+        drec.append_float(VALUE_MY_NAN, 8);
         // drec.append_mac(VALUE_SRC_MAC);
 
         register_template(trec);
@@ -533,6 +539,9 @@ protected:
     std::string VALUE_SRC_IP4    = "127.0.0.1";
     std::string VALUE_DST_IP4    = "8.8.8.8";
     std::string VALUE_APP_DES    = "web\\\nclose\t\"open\bdog\fcat\r\"\x13";
+    double      VALUE_MY_PINF    = std::numeric_limits<double>::infinity();
+    double      VALUE_MY_MINF    = -std::numeric_limits<double>::infinity();
+    double      VALUE_MY_NAN     = NAN;
     uint16_t    VALUE_SRC_PORT   = 65000;
     uint16_t    VALUE_DST_PORT   = 80;
     uint8_t     VALUE_PROTO      = 6; // TCP
@@ -546,6 +555,7 @@ protected:
     double      VALUE_MY_FLOAT64 = 0.1234;
     double      VALUE_MY_FLOAT32 = 0.5678;
     signed      VALUE_MY_INT     = 1006;
+
     // std::string VALUE_SRC_MAC   = "01:12:1f:13:11:8a";
 };
 
@@ -559,6 +569,7 @@ TEST_F(Drec_extra, testTypes)
 
     int rc = fds_drec2json(&m_drec, flags, &buff, &buff_size);
     ASSERT_GT(rc, 0);
+    EXPECT_EQ(size_t(rc), strlen(buff));
     Config cfg = parse_string(buff, JSON, "drec2json");
     EXPECT_EQ((double)cfg["iana:myFloat64"], VALUE_MY_FLOAT64);
     EXPECT_EQ((double)cfg["iana:myFloat32"], VALUE_MY_FLOAT32);
@@ -579,6 +590,7 @@ TEST_F(Drec_extra, nonPrintable)
 
     int rc = fds_drec2json(&m_drec, flags, &buff, &buff_size);
     ASSERT_GT(rc, 0);
+    EXPECT_EQ(size_t(rc), strlen(buff));
     Config cfg = parse_string(buff, JSON, "drec2json");
     EXPECT_EQ(cfg["iana:applicationDescription"], "web\\close\"opendogcat\"");
 
@@ -595,6 +607,7 @@ TEST_F(Drec_extra, printableChar)
 
     int rc = fds_drec2json(&m_drec, flags, &buff, &buff_size);
     ASSERT_GT(rc, 0);
+    EXPECT_EQ(size_t(rc), strlen(buff));
     Config cfg = parse_string(buff, JSON, "drec2json");
     // For conversion from JSON to C natation cares JSON parser
     EXPECT_EQ((std::string)cfg["iana:applicationDescription"], VALUE_APP_DES);
@@ -603,7 +616,7 @@ TEST_F(Drec_extra, printableChar)
 }
 
 // Test for formating flag (FDS_CD2J_FORMAT_TCPFLAGS)
-TEST_F(Drec_extra, convFlag)
+TEST_F(Drec_extra, tcpFlag)
 {
     constexpr size_t BSIZE = 5U;
     char* buff = (char*) malloc(BSIZE);
@@ -620,9 +633,31 @@ TEST_F(Drec_extra, convFlag)
     free(buff);
 }
 
+// Test for NAN, +INF, -INF values
+TEST_F(Drec_extra, extraValue)
+{
+    constexpr size_t BSIZE = 5U;
+    char* buff = (char*) malloc(BSIZE);
+    uint32_t flags = FDS_CD2J_ALLOW_REALLOC;
+    size_t buff_size = BSIZE;
+
+    int rc = fds_drec2json(&m_drec, flags, &buff, &buff_size);
+    ASSERT_GT(rc, 0);
+    EXPECT_EQ(size_t(rc), strlen(buff));
+    EXPECT_NE(buff_size, BSIZE);
+    Config cfg = parse_string(buff, JSON, "drec2json");
+    EXPECT_TRUE(cfg["iana:myNan"].is_string());
+    EXPECT_EQ(cfg["iana:myNan"],"NaN");
+    EXPECT_TRUE(cfg["iana:myPInf"].is_string());
+    EXPECT_EQ(cfg["iana:myPInf"],"Infinity");
+    EXPECT_TRUE(cfg["iana:myMInf"].is_string());
+    EXPECT_EQ(cfg["iana:myMInf"],"-Infinity");
+
+    free(buff);
+}
+
 
 
 /* TODO
     Test for "to_octate" with field size > 8
-    Test for +-NAN, +-INF 
  */
