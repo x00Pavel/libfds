@@ -259,18 +259,16 @@ to_float(struct context *buffer, const struct fds_drec_field *field)
     const char *str;
     // Size 8 (double)
     if (isinf(value) && value >= 0) {
-        str = "\"inf\"";
+        str = "\"Infinity\"";
     } else if (isinf(value) && value < 0) {
-        str = "\"-inf\"";
-    } else if (isnan(value) && value >= 0) {
-        str = "\"nan\"";
-    } else if (isnan(value) && value < 0) {
-        str = "\"-nan\"";
+        str = "\"-Infinity\"";
+    } else if (isnan(value)) {
+        str = "\"NaN\"";
     } else {
         str = "null";
     }
 
-    size_t size = strlen(str) + 1; // + '\0'
+    size_t size = strlen(str);
 
     int ret_code = buffer_reserve(buffer, buffer_used(buffer) + size);
     if (ret_code != FDS_OK) {
