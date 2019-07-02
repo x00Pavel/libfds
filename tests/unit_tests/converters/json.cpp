@@ -532,7 +532,7 @@ protected:
 
     std::string VALUE_SRC_IP4    = "127.0.0.1";
     std::string VALUE_DST_IP4    = "8.8.8.8";
-    std::string VALUE_APP_DES    = "web\nclose\topen\x13";
+    std::string VALUE_APP_DES    = "web\\\nclose\t\"open\bdog\fcat\r\"\x13";
     uint16_t    VALUE_SRC_PORT   = 65000;
     uint16_t    VALUE_DST_PORT   = 80;
     uint8_t     VALUE_PROTO      = 6; // TCP
@@ -580,7 +580,7 @@ TEST_F(Drec_extra, nonPrintable)
     int rc = fds_drec2json(&m_drec, flags, &buff, &buff_size);
     ASSERT_GT(rc, 0);
     Config cfg = parse_string(buff, JSON, "drec2json");
-    EXPECT_EQ(cfg["iana:applicationDescription"], "webcloseopen");
+    EXPECT_EQ(cfg["iana:applicationDescription"], "web\\close\"opendogcat\"");
 
     free(buff);
 }
@@ -604,5 +604,6 @@ TEST_F(Drec_extra, printableChar)
 
 /* TODO
     Test "to flag" (in Drec_basic using VALUE_TCPBITS)
-
+    Test for "to_octate" with field size > 8
+    
  */
