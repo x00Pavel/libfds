@@ -540,7 +540,7 @@ protected:
     uint64_t    VALUE_TS_LST     = 1522670372999ULL;
     uint64_t    VALUE_BYTES      = 1234567;
     uint64_t    VALUE_PKTS       = 12345;
-    double      VALUE_UNKNOWN    = 3.1416f;
+    double      VALUE_UNKNOWN    = 3.141233454443216f;
     uint8_t     VALUE_TCPBITS    = 0x13; // ACK, SYN, FIN
     bool        VALUE_MY_BOOL    = true;
     double      VALUE_MY_FLOAT64 = 0.1234;
@@ -602,8 +602,27 @@ TEST_F(Drec_extra, printableChar)
     free(buff);
 }
 
+// Test for formating flag (FDS_CD2J_FORMAT_TCPFLAGS)
+TEST_F(Drec_extra, convFlag)
+{
+    constexpr size_t BSIZE = 5U;
+    char* buff = (char*) malloc(BSIZE);
+    uint32_t flags = FDS_CD2J_ALLOW_REALLOC | FDS_CD2J_FORMAT_TCPFLAGS;
+    size_t buff_size = BSIZE;
+
+    int rc = fds_drec2json(&m_drec, flags, &buff, &buff_size);
+    ASSERT_GT(rc, 0);
+    EXPECT_EQ(size_t(rc), strlen(buff));
+    EXPECT_NE(buff_size, BSIZE);
+    Config cfg = parse_string(buff, JSON, "drec2json");
+    EXPECT_EQ((std::string)cfg["iana:tcpControlBits"], ".A..SF");
+
+    free(buff);
+}
+
+
+
 /* TODO
-    Test "to flag" (in Drec_basic using VALUE_TCPBITS)
     Test for "to_octate" with field size > 8
-    
+    Test for +-NAN, +-INF 
  */
