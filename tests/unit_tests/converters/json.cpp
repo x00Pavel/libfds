@@ -500,7 +500,9 @@ protected:
         trec.add_field(  6, 1);             // tcpControlBits
         trec.add_field(1001,1);             // myBool
         trec.add_field(1000,8);             // myFloat64
+        trec.add_field(1003,4);             // myFloat32
         trec.add_field(1002,8);             // myInt
+
         // trec.add_field(56, 6);              // sourceMacAddress
 
         // Prepare an IPFIX Data Record
@@ -519,7 +521,8 @@ protected:
         drec.append_float(VALUE_UNKNOWN, 8);
         drec.append_uint(VALUE_TCPBITS, 1);
         drec.append_bool(VALUE_MY_BOOL);
-        drec.append_float(VALUE_MY_FLOAT, 8);
+        drec.append_float(VALUE_MY_FLOAT64, 8);
+        drec.append_float(VALUE_MY_FLOAT32, 4);
         drec.append_int(VALUE_MY_INT,8);
         // drec.append_mac(VALUE_SRC_MAC);
 
@@ -527,21 +530,22 @@ protected:
         drec_create(256, drec);
     }
 
-    std::string VALUE_SRC_IP4  = "127.0.0.1";
-    std::string VALUE_DST_IP4  = "8.8.8.8";
-    std::string VALUE_APP_DES  = "web\nclose\topen\x13";
-    uint16_t    VALUE_SRC_PORT = 65000;
-    uint16_t    VALUE_DST_PORT = 80;
-    uint8_t     VALUE_PROTO    = 6; // TCP
-    uint64_t    VALUE_TS_FST   = 1522670362000ULL;
-    uint64_t    VALUE_TS_LST   = 1522670372999ULL;
-    uint64_t    VALUE_BYTES    = 1234567;
-    uint64_t    VALUE_PKTS     = 12345;
-    double      VALUE_UNKNOWN  = 3.1416f;
-    uint8_t     VALUE_TCPBITS  = 0x13; // ACK, SYN, FIN
-    bool        VALUE_MY_BOOL  = true;
-    double      VALUE_MY_FLOAT = 0.1234;
-    signed      VALUE_MY_INT   = 1006;
+    std::string VALUE_SRC_IP4    = "127.0.0.1";
+    std::string VALUE_DST_IP4    = "8.8.8.8";
+    std::string VALUE_APP_DES    = "web\nclose\topen\x13";
+    uint16_t    VALUE_SRC_PORT   = 65000;
+    uint16_t    VALUE_DST_PORT   = 80;
+    uint8_t     VALUE_PROTO      = 6; // TCP
+    uint64_t    VALUE_TS_FST     = 1522670362000ULL;
+    uint64_t    VALUE_TS_LST     = 1522670372999ULL;
+    uint64_t    VALUE_BYTES      = 1234567;
+    uint64_t    VALUE_PKTS       = 12345;
+    double      VALUE_UNKNOWN    = 3.1416f;
+    uint8_t     VALUE_TCPBITS    = 0x13; // ACK, SYN, FIN
+    bool        VALUE_MY_BOOL    = true;
+    double      VALUE_MY_FLOAT64 = 0.1234;
+    double      VALUE_MY_FLOAT32 = 0.5678;
+    signed      VALUE_MY_INT     = 1006;
     // std::string VALUE_SRC_MAC   = "01:12:1f:13:11:8a";
 };
 
@@ -556,7 +560,8 @@ TEST_F(Drec_extra, testTypes)
     int rc = fds_drec2json(&m_drec, flags, &buff, &buff_size);
     ASSERT_GT(rc, 0);
     Config cfg = parse_string(buff, JSON, "drec2json");
-    EXPECT_EQ((double)cfg["iana:myFloat"], VALUE_MY_FLOAT);
+    EXPECT_EQ((double)cfg["iana:myFloat64"], VALUE_MY_FLOAT64);
+    EXPECT_EQ((double)cfg["iana:myFloat32"], VALUE_MY_FLOAT32);
     EXPECT_EQ(cfg["iana:myBool"], VALUE_MY_BOOL);
     EXPECT_EQ((signed)cfg["iana:myInt"], VALUE_MY_INT);
     // EXPECT_EQ(cfg["iana:sourceMacAddress"], VALUE_SRC_MAC);
