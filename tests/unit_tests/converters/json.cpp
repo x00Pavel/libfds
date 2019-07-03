@@ -487,7 +487,7 @@ protected:
         ipfix_trec trec{256};
         trec.add_field(  8, 4);             // sourceIPv4Address
         trec.add_field( 12, 4);             // destinationIPv4Address
-        trec.add_field( 94, ipfix_trec::SIZE_VAR);             // applicationDescription (string)
+        trec.add_field( 94, ipfix_trec::SIZE_VAR);// applicationDescription (string)
         trec.add_field(  7, 2);             // sourceTransportPort
         trec.add_field( 11, 2);             // destinationTransportPort
         trec.add_field(  4, 1);             // protocolIdentifier
@@ -507,7 +507,7 @@ protected:
         trec.add_field(1006,8);             // myNan
         trec.add_field(83,ipfix_trec::SIZE_VAR); //interfaceDescription
         trec.add_field(56, 6);              // sourceMacAddress
-        // trec.add_field(57, 6);              // sourceMacAddress
+        trec.add_field(95,10);              // applicationId
 
         // Prepare an IPFIX Data Record
         ipfix_drec drec{};
@@ -533,7 +533,7 @@ protected:
         drec.append_float(VALUE_MY_NAN, 8);
         drec.append_string(VALUE_INF_DES);
         drec.append_mac(VALUE_SRC_MAC);
-        // drec.append_mac(VALUE_DST_MAC);
+        drec.append_octets(VALUE_APP_ID.c_str(),(uint16_t)10, false);
 
         register_template(trec);
         drec_create(256, drec);
@@ -559,7 +559,8 @@ protected:
     double      VALUE_MY_FLOAT64 = 0.1234;
     double      VALUE_MY_FLOAT32 = 0.5678;
     signed      VALUE_MY_INT     = 1006;
-    std::string VALUE_SRC_MAC   = "01:12:1F:13:11:8A";
+    std::string VALUE_SRC_MAC    = "01:12:1F:13:11:8A";
+    std::string VALUE_APP_ID     = "\x33\x23\x24\x30\x31\x32\x34\x35\x36\x37"; // 3#$0124567
 
 };
 
@@ -579,7 +580,7 @@ TEST_F(Drec_extra, testTypes)
     EXPECT_EQ((double)cfg["iana:myFloat32"], VALUE_MY_FLOAT32);
     EXPECT_EQ(cfg["iana:myBool"], VALUE_MY_BOOL);
     EXPECT_EQ((signed)cfg["iana:myInt"], VALUE_MY_INT);
-    // EXPECT_EQ(cfg["iana:sourceMacAddress"], VALUE_SRC_MAC);
+    EXPECT_EQ(cfg["iana:sourceMacAddress"], VALUE_SRC_MAC);
 
     free(buff);
 }
@@ -696,10 +697,50 @@ TEST_F(Drec_extra, macAdr)
     free(buff);
 }
 
+// Test for octet values
+TEST_F(Drec_extra, octVal)
+{
+    constexpr size_t BSIZE = 5U;
+    char* buff = (char*) malloc(BSIZE);
+    uint32_t flags = FDS_CD2J_ALLOW_REALLOC;
+    size_t buff_size = BSIZE;
 
+    int rc = fds_drec2json(&m_drec, flags, &buff, &buff_size);
+    ASSERT_GT(rc, 0);
+    EXPECT_NE(buff_size, BSIZE);
+    Config cfg = parse_string(buff, JSON, "drec2json");
+    EXPECT_EQ((std::string)cfg["iana:applicationId"], "0x33232430313234353637");
 
+    free(buff);
+}
+
+// Test for executing branches with memory realocation
+TEST_F(Drec_extra, forLoop)
+{
+    constexpr size_t BSIZE = 1U;
+    char* def_buff = (char*) malloc(BSIZE);
+    uint32_t def_flags = FDS_CD2J_ALLOW_REALLOC;
+    size_t def_buff_size = BSIZE;
+
+    int def_rc = fds_drec2json(&m_drec, def_flags, &def_buff, &def_buff_size);
+    ASSERT_GT(def_rc, 0);
+    EXPECT_NE(def_buff_size, BSIZE);
+    EXPECT_EQ(size_t(def_rc), strlen(def_buff));
+    EXPECT_NE(def_buff_size, BSIZE);
+
+    free(def_buff);
+    // Loop check right situations
+    for (int i = 0; i < def_rc; i++){
+        char*  new_buff = (char*) malloc(i);
+        uint32_t new_flags = FDS_CD2J_ALLOW_REALLOC;
+        size_t new_buff_size = i;
+
+        int new_rc = fds_drec2json(&m_drec, new_flags, &new_buff, &new_buff_size);
+        EXPECT_GT(new_rc, 0);
+        free(new_buff);
+    }
+
+}
 
 /* TODO
-    Test for "to_octate" with field size > 8
-    Test for characters from extended ASCII
-*/
+    test for non valid values fro multi field_flags*/
