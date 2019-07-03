@@ -268,13 +268,16 @@ to_float(struct context *buffer, const struct fds_drec_field *field)
         str = "null";
     }
 
+    // size without '\0'
     size_t size = strlen(str);
 
-    int ret_code = buffer_reserve(buffer, buffer_used(buffer) + size);
+    // +1 because strcpy cope '\0' too, so there need to be reserved more, then 'size'
+    int ret_code = buffer_reserve(buffer, buffer_used(buffer) + size + 1);
     if (ret_code != FDS_OK) {
         return ret_code;
     }
 
+    // copy with '\0'
     strcpy(buffer->write_begin, str);
     buffer->write_begin += size;
     return FDS_OK;
@@ -454,7 +457,7 @@ to_ip(struct context *buffer, const struct fds_drec_field *field)
  * \brief Convert IPFIX string to JSON string
  *
  * Non-ASCII characters are automatically converted to the special escaped sequence i.e. '\uXXXX'.
- * Quote and backslash are always escaped and while space (and control) characters are converted
+ * Quote and backslash are always escaped and white space (and control) characters are converted
  * based on active configuration.
  * \param[in] field Field to convert
  * \return #FDS_OK on success
