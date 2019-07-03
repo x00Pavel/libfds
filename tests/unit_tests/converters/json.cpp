@@ -505,8 +505,9 @@ protected:
         trec.add_field(1004,8);             // myPInf
         trec.add_field(1005,8);             // myMInf
         trec.add_field(1006,8);             // myNan
-
-        // trec.add_field(56, 6);              // sourceMacAddress
+        trec.add_field(83,ipfix_trec::SIZE_VAR); //interfaceDescription
+        trec.add_field(56, 6);              // sourceMacAddress
+        // trec.add_field(57, 6);              // sourceMacAddress
 
         // Prepare an IPFIX Data Record
         ipfix_drec drec{};
@@ -530,7 +531,9 @@ protected:
         drec.append_float(VALUE_MY_PINF,8);
         drec.append_float(VALUE_MY_MINF,8);
         drec.append_float(VALUE_MY_NAN, 8);
-        // drec.append_mac(VALUE_SRC_MAC);
+        drec.append_string(VALUE_INF_DES);
+        drec.append_mac(VALUE_SRC_MAC);
+        // drec.append_mac(VALUE_DST_MAC);
 
         register_template(trec);
         drec_create(256, drec);
@@ -539,6 +542,7 @@ protected:
     std::string VALUE_SRC_IP4    = "127.0.0.1";
     std::string VALUE_DST_IP4    = "8.8.8.8";
     std::string VALUE_APP_DES    = "web\\\nclose\t\"open\bdog\fcat\r\"\x13";
+    std::string VALUE_INF_DES    = "prety=white+ cleannothing$";
     double      VALUE_MY_PINF    = std::numeric_limits<double>::infinity();
     double      VALUE_MY_MINF    = -std::numeric_limits<double>::infinity();
     double      VALUE_MY_NAN     = NAN;
@@ -555,8 +559,8 @@ protected:
     double      VALUE_MY_FLOAT64 = 0.1234;
     double      VALUE_MY_FLOAT32 = 0.5678;
     signed      VALUE_MY_INT     = 1006;
+    std::string VALUE_SRC_MAC   = "01:12:1F:13:11:8A";
 
-    // std::string VALUE_SRC_MAC   = "01:12:1f:13:11:8a";
 };
 
 // Test for diferent data types
@@ -656,8 +660,46 @@ TEST_F(Drec_extra, extraValue)
     free(buff);
 }
 
+// Test for other ASCII characters
+TEST_F(Drec_extra, otherChar)
+{
+    constexpr size_t BSIZE = 5U;
+    char* buff = (char*) malloc(BSIZE);
+    uint32_t flags = FDS_CD2J_ALLOW_REALLOC;
+    size_t buff_size = BSIZE;
+
+    int rc = fds_drec2json(&m_drec, flags, &buff, &buff_size);
+    ASSERT_GT(rc, 0);
+    EXPECT_EQ(size_t(rc), strlen(buff));
+    EXPECT_NE(buff_size, BSIZE);
+    Config cfg = parse_string(buff, JSON, "drec2json");
+    EXPECT_EQ(cfg["iana:interfaceDescription"], VALUE_INF_DES);
+
+    free(buff);
+}
+
+// Test for other MAC adress
+TEST_F(Drec_extra, macAdr)
+{
+    constexpr size_t BSIZE = 5U;
+    char* buff = (char*) malloc(BSIZE);
+    uint32_t flags = FDS_CD2J_ALLOW_REALLOC;
+    size_t buff_size = BSIZE;
+
+    int rc = fds_drec2json(&m_drec, flags, &buff, &buff_size);
+    ASSERT_GT(rc, 0);
+    EXPECT_EQ(size_t(rc), strlen(buff));
+    EXPECT_NE(buff_size, BSIZE);
+    Config cfg = parse_string(buff, JSON, "drec2json");
+    EXPECT_EQ(cfg["iana:sourceMacAddress"], VALUE_SRC_MAC);
+
+    free(buff);
+}
+
+
 
 
 /* TODO
     Test for "to_octate" with field size > 8
- */
+    Test for characters from extended ASCII
+*/
