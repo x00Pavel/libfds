@@ -99,7 +99,7 @@ buffer_append(struct context *buffer,const char *str)
 {
     const size_t len = strlen(str) + 1; // "\0"
 
-    int ret_code = buffer_reserve(buffer ,buffer_used(buffer) + len);
+    int ret_code = buffer_reserve(buffer ,buffer_used(buffer) + len + 1); // +1 for error with uvalid size
     if (ret_code != FDS_OK) {
         return ret_code;
     }
