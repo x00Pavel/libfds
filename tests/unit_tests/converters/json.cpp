@@ -742,5 +742,82 @@ TEST_F(Drec_extra, forLoop)
 
 }
 
+
+// -------------------------------------------------------------------------------------------------
+/// IPFIX Data Record for extra situations
+class Drec_err : public Drec_base {
+protected:
+    /// Before each Test case
+    void SetUp() override {
+        Drec_base::SetUp();
+
+        // Prepare an IPFIX Template
+        ipfix_trec trec{256};
+        trec.add_field(  8, 0);             // sourceIPv4Address
+        trec.add_field( 12, 4);             // destinationIPv4Address
+        trec.add_field( 11, 2);             // destinationTransportPort
+        trec.add_field( 82, ipfix_trec::SIZE_VAR); // interfaceName
+        trec.add_field( 82, 0);  // interfaceName (second occurrence)
+
+        // Prepare an IPFIX Data Record
+        ipfix_drec drec{};
+        drec.append_ip(VALUE_DST_IP4);
+        drec.append_uint(VALUE_DST_PORT, 2);
+        drec.append_string(VALUE_IFC1); // empty string (only header)
+        drec.append_string(VALUE_IFC2);
+
+        register_template(trec);
+        drec_create(256, drec);
+    }
+
+    std::string VALUE_DST_IP4    = "8.8.8.8";
+    std::string VALUE_IFC1       = "qwert";           // empty string
+    std::string VALUE_IFC2       = "enp0s31f6";
+    uint16_t    VALUE_SRC_PORT   = 65000;
+    uint16_t    VALUE_DST_PORT   = 80;
+
+};
+
+TEST_F(Drec_err, multiErr)
+{
+    constexpr size_t BSIZE = 2U;
+    char* buff = (char*) malloc(BSIZE);
+    uint32_t flags = FDS_CD2J_ALLOW_REALLOC;
+    size_t buff_size = BSIZE;
+
+   int rc = fds_drec2json(&m_drec, flags, &buff, &buff_size);
+   ASSERT_GT(rc, 0);
+   // ASSERT_GT(rc, ERR);
+   EXPECT_EQ(size_t(rc), strlen(buff));
+   Config cfg = parse_string(buff, JSON, "drec2json");
+   EXPECT_TRUE(cfg["iana:sourceIPv4Address"].is_null());
+
+   free(buff);
+}
+
+TEST_F(Drec_err, zeroSizeStr)
+{
+    constexpr size_t BSIZE = 2U;
+    char* buff = (char*) malloc(BSIZE);
+    uint32_t flags = FDS_CD2J_ALLOW_REALLOC;
+    size_t buff_size = BSIZE;
+
+   int rc = fds_drec2json(&m_drec, flags, &buff, &buff_size);
+   ASSERT_GT(rc, 0);
+   // ASSERT_GT(rc, ERR);
+   EXPECT_EQ(size_t(rc), strlen(buff));
+   Config cfg = parse_string(buff, JSON, "drec2json");
+   EXPECT_TRUE(cfg["iana:interfaceName"].is_array());
+   auto cfg_arr = cfg["iana:interfaceName"].as_array();
+   EXPECT_EQ(cfg_arr.size(), 2U);
+   EXPECT_NE(std::find(cfg_arr.begin(), cfg_arr.end(), VALUE_IFC1), cfg_arr.end());
+   EXPECT_NE(std::find(cfg_arr.begin(), cfg_arr.end(), ""), cfg_arr.end());
+
+   free(buff);
+}
+
+
 /* TODO
-    test for non valid values fro multi field_flags*/
+    Test for flags with size 2
+
+*/
