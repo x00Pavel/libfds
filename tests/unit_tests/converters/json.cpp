@@ -240,6 +240,25 @@ TEST_F(Drec_basic, allowRealloc)
     free(buff);
 }
 
+// Test for formating flag (FDS_CD2J_FORMAT_TCPFLAGS)
+TEST_F(Drec_basic, tcpFlag)
+{
+    constexpr size_t BSIZE = 5U;
+    char* buff = (char*) malloc(BSIZE);
+    uint32_t flags = FDS_CD2J_ALLOW_REALLOC | FDS_CD2J_FORMAT_TCPFLAGS;
+    size_t buff_size = BSIZE;
+
+    int rc = fds_drec2json(&m_drec, flags, &buff, &buff_size);
+    ASSERT_GT(rc, 0);
+    EXPECT_EQ(size_t(rc), strlen(buff));
+    EXPECT_NE(buff_size, BSIZE);
+    Config cfg = parse_string(buff, JSON, "drec2json");
+    EXPECT_EQ((std::string)cfg["iana:tcpControlBits"], ".A..SF");
+
+    free(buff);
+}
+
+
 // -------------------------------------------------------------------------------------------------
 /// IPFIX Data Record of a biflow
 class Drec_biflow : public Drec_base { protected:
@@ -460,7 +479,7 @@ TEST_F(Drec_biflow, protoFormat)
     free(buff);
 }
 
-
+// Test fro nonprintable characters (FDS_CD2J_NON_PRINTABLE)
 TEST_F(Drec_biflow, nonPrint)
 {
     constexpr size_t BSIZE = 2000U;
@@ -497,7 +516,7 @@ protected:
         trec.add_field(  1, 8);             // octetDeltaCount
         trec.add_field(  2, 8);             // packetDeltaCount
         trec.add_field(100, 8, 10000);      // -- field with unknown definition --
-        trec.add_field(  6, 1);             // tcpControlBits
+        trec.add_field(  6, 2);             // tcpControlBits
         trec.add_field(1001,1);             // myBool
         trec.add_field(1000,8);             // myFloat64
         trec.add_field(1003,4);             // myFloat32
@@ -523,7 +542,7 @@ protected:
         drec.append_uint(VALUE_BYTES, 8);
         drec.append_uint(VALUE_PKTS, 8);
         drec.append_float(VALUE_UNKNOWN, 8);
-        drec.append_uint(VALUE_TCPBITS, 1);
+        drec.append_uint(VALUE_TCPBITS, 2);
         drec.append_bool(VALUE_MY_BOOL);
         drec.append_float(VALUE_MY_FLOAT64, 8);
         drec.append_float(VALUE_MY_FLOAT32, 4);
@@ -616,24 +635,6 @@ TEST_F(Drec_extra, printableChar)
     Config cfg = parse_string(buff, JSON, "drec2json");
     // For conversion from JSON to C natation cares JSON parser
     EXPECT_EQ((std::string)cfg["iana:applicationDescription"], VALUE_APP_DES);
-
-    free(buff);
-}
-
-// Test for formating flag (FDS_CD2J_FORMAT_TCPFLAGS)
-TEST_F(Drec_extra, tcpFlag)
-{
-    constexpr size_t BSIZE = 5U;
-    char* buff = (char*) malloc(BSIZE);
-    uint32_t flags = FDS_CD2J_ALLOW_REALLOC | FDS_CD2J_FORMAT_TCPFLAGS;
-    size_t buff_size = BSIZE;
-
-    int rc = fds_drec2json(&m_drec, flags, &buff, &buff_size);
-    ASSERT_GT(rc, 0);
-    EXPECT_EQ(size_t(rc), strlen(buff));
-    EXPECT_NE(buff_size, BSIZE);
-    Config cfg = parse_string(buff, JSON, "drec2json");
-    EXPECT_EQ((std::string)cfg["iana:tcpControlBits"], ".A..SF");
 
     free(buff);
 }
@@ -742,6 +743,23 @@ TEST_F(Drec_extra, forLoop)
 
 }
 
+// Test for formating flag of size 2 (FDS_CD2J_FORMAT_TCPFLAGS)
+TEST_F(Drec_extra, flagSize2)
+{
+    constexpr size_t BSIZE = 5U;
+    char* buff = (char*) malloc(BSIZE);
+    uint32_t flags = FDS_CD2J_ALLOW_REALLOC | FDS_CD2J_FORMAT_TCPFLAGS;
+    size_t buff_size = BSIZE;
+
+    int rc = fds_drec2json(&m_drec, flags, &buff, &buff_size);
+    ASSERT_GT(rc, 0);
+    EXPECT_EQ(size_t(rc), strlen(buff));
+    EXPECT_NE(buff_size, BSIZE);
+    Config cfg = parse_string(buff, JSON, "drec2json");
+    EXPECT_EQ((std::string)cfg["iana:tcpControlBits"], ".A..SF");
+
+    free(buff);
+}
 
 // -------------------------------------------------------------------------------------------------
 /// IPFIX Data Record for extra situations
