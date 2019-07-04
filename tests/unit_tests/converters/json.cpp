@@ -771,12 +771,21 @@ protected:
 
         // Prepare an IPFIX Template
         ipfix_trec trec{256};
-        trec.add_field(  8, 0);             // sourceIPv4Address
-        trec.add_field( 12, 0);             // destinationIPv4Address (second occurrence)
+        trec.add_field( 8,  0);             // sourceIPv4Address
+        trec.add_field(12,  0);             // destinationIPv4Address (second occurrence)
+        trec.add_field(24,  0);             // postPacketDeltaCount
+        trec.add_field(1002,0);             // myInt
+        trec.add_field(1003,0);             // myFloat32
+        trec.add_field(1000,0);             // myFloat64
+        trec.add_field(156, 0);             // flowStartNanoseconds
+        trec.add_field(  4, 0);             // protocolIdentifier
+        trec.add_field(  6, 0);             // tcpControlBits
+        trec.add_field(56,  0);             // sourceMacAddress
         trec.add_field( 12, 4);             // destinationIPv4Address
         trec.add_field( 11, 2);             // destinationTransportPort
         trec.add_field( 82, ipfix_trec::SIZE_VAR); // interfaceName
         trec.add_field( 82, 0);             // interfaceName (second occurrence)
+        trec.add_field(1001,2);             // myBool
 
         // Prepare an IPFIX Data Record
         ipfix_drec drec{};
@@ -784,6 +793,7 @@ protected:
         drec.append_uint(VALUE_DST_PORT, 2);
         drec.append_string(VALUE_IFC1); // empty string (only header)
         drec.append_string(VALUE_IFC2);
+        drec.append_bool(VALUE_MY_BOOL);
 
         register_template(trec);
         drec_create(256, drec);
@@ -794,6 +804,11 @@ protected:
     std::string VALUE_IFC2       = "enp0s31f6";
     uint16_t    VALUE_SRC_PORT   = 65000;
     uint16_t    VALUE_DST_PORT   = 80;
+    bool        VALUE_MY_BOOL    = true;
+
+    // drec.append_datetime(VALUE_TS_FST, FDS_ET_DATE_TIME_NANOSECONDS);
+
+    // uint64_t    VALUE_TS_FST   = 1522670362000ULL;
 
 };
 
@@ -810,6 +825,15 @@ TEST_F(Drec_unvalid, unvalidField)
    EXPECT_EQ(size_t(rc), strlen(buff));
    Config cfg = parse_string(buff, JSON, "drec2json");
    EXPECT_TRUE(cfg["iana:sourceIPv4Address"].is_null());
+   EXPECT_TRUE(cfg["iana:myBool"].is_null());
+   EXPECT_TRUE(cfg["iana:postPacketDeltaCount"].is_null());
+   EXPECT_TRUE(cfg["iana:myInt"].is_null());
+   EXPECT_TRUE(cfg["iana:myFloat32"].is_null());
+   EXPECT_TRUE(cfg["iana:myFloat64"].is_null());
+   EXPECT_TRUE(cfg["iana:flowStartNanoseconds"].is_null());
+   EXPECT_TRUE(cfg["iana:protocolIdentifier"].is_null());
+   EXPECT_TRUE(cfg["iana:tcpControlBits"].is_null());
+   EXPECT_TRUE(cfg["iana:sourceMacAddress"].is_null());
 
    free(buff);
 }
@@ -857,42 +881,7 @@ TEST_F(Drec_unvalid, zeroSizeStr)
    free(buff);
 }
 
-
-class Drec_err : public Drec_base {
-protected:
-    /// Before each Test case
-    void SetUp() override {
-        Drec_base::SetUp();
-
-        // Prepare an IPFIX Template
-        ipfix_trec trec{256};
-        trec.add_field(1001,2);             // myBool
-
-        // Prepare an IPFIX Data Record
-        ipfix_drec drec{};
-        drec.append_bool(VALUE_MY_BOOL);
-
-        register_template(trec);
-        drec_create(256, drec);
-    }
-
-    bool        VALUE_MY_BOOL    = true;
-
-};
-
-// Test for
-TEST_F(Drec_err, uvalidBoolSize)
-{
-    constexpr size_t BSIZE = 2U;
-    char* buff = (char*) malloc(BSIZE);
-    uint32_t flags = FDS_CD2J_ALLOW_REALLOC;
-    size_t buff_size = BSIZE;
-
-    int rc = fds_drec2json(&m_drec, flags, &buff, &buff_size);
-    ASSERT_GT(rc, FDS_ERR_ARG);
-    std::cout << buff << std::endl;
-    free(buff);
-}
 /* TODO
-
+    Test fds_octet_array2str
+    Test to_float, but not with +-inf, nan, float
 */
