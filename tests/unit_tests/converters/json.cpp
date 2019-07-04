@@ -762,8 +762,8 @@ TEST_F(Drec_extra, flagSize2)
 }
 
 // -------------------------------------------------------------------------------------------------
-/// IPFIX Data Record for extra situations
-class Drec_err : public Drec_base {
+/// IPFIX Data Record for unvalid situations
+class Drec_unvalid : public Drec_base {
 protected:
     /// Before each Test case
     void SetUp() override {
@@ -772,10 +772,11 @@ protected:
         // Prepare an IPFIX Template
         ipfix_trec trec{256};
         trec.add_field(  8, 0);             // sourceIPv4Address
+        trec.add_field( 12, 0);             // destinationIPv4Address (second occurrence)
         trec.add_field( 12, 4);             // destinationIPv4Address
         trec.add_field( 11, 2);             // destinationTransportPort
         trec.add_field( 82, ipfix_trec::SIZE_VAR); // interfaceName
-        trec.add_field( 82, 0);  // interfaceName (second occurrence)
+        trec.add_field( 82, 0);             // interfaceName (second occurrence)
 
         // Prepare an IPFIX Data Record
         ipfix_drec drec{};
@@ -796,7 +797,8 @@ protected:
 
 };
 
-TEST_F(Drec_err, multiErr)
+//  Test for adding null in case of unvalid field
+TEST_F(Drec_unvalid, unvalidField)
 {
     constexpr size_t BSIZE = 2U;
     char* buff = (char*) malloc(BSIZE);
@@ -805,7 +807,6 @@ TEST_F(Drec_err, multiErr)
 
    int rc = fds_drec2json(&m_drec, flags, &buff, &buff_size);
    ASSERT_GT(rc, 0);
-   // ASSERT_GT(rc, ERR);
    EXPECT_EQ(size_t(rc), strlen(buff));
    Config cfg = parse_string(buff, JSON, "drec2json");
    EXPECT_TRUE(cfg["iana:sourceIPv4Address"].is_null());
@@ -813,7 +814,30 @@ TEST_F(Drec_err, multiErr)
    free(buff);
 }
 
-TEST_F(Drec_err, zeroSizeStr)
+//  Test for adding null to multifield in case of unvalid field
+TEST_F(Drec_unvalid, nullInMulti)
+{
+    constexpr size_t BSIZE = 2U;
+    char* buff = (char*) malloc(BSIZE);
+    uint32_t flags = FDS_CD2J_ALLOW_REALLOC;
+    size_t buff_size = BSIZE;
+
+    int rc = fds_drec2json(&m_drec, flags, &buff, &buff_size);
+    ASSERT_GT(rc, 0);
+    EXPECT_EQ(size_t(rc), strlen(buff));
+    Config cfg = parse_string(buff, JSON, "drec2json");
+
+    ASSERT_TRUE(cfg["iana:destinationIPv4Address"].is_array());
+    auto cfg_arr = cfg["iana:interfaceName"].as_array();
+    EXPECT_EQ(cfg_arr.size(), 2U);
+    EXPECT_EQ(std::find(cfg_arr.begin(), cfg_arr.end(), VALUE_DST_IP4), cfg_arr.end());
+    EXPECT_EQ(std::find(cfg_arr.begin(), cfg_arr.end(), NULL), cfg_arr.end());
+
+    free(buff);
+}
+
+// Test fot string with size 0
+TEST_F(Drec_unvalid, zeroSizeStr)
 {
     constexpr size_t BSIZE = 2U;
     char* buff = (char*) malloc(BSIZE);
@@ -822,10 +846,9 @@ TEST_F(Drec_err, zeroSizeStr)
 
    int rc = fds_drec2json(&m_drec, flags, &buff, &buff_size);
    ASSERT_GT(rc, 0);
-   // ASSERT_GT(rc, ERR);
    EXPECT_EQ(size_t(rc), strlen(buff));
    Config cfg = parse_string(buff, JSON, "drec2json");
-   EXPECT_TRUE(cfg["iana:interfaceName"].is_array());
+   ASSERT_TRUE(cfg["iana:interfaceName"].is_array());
    auto cfg_arr = cfg["iana:interfaceName"].as_array();
    EXPECT_EQ(cfg_arr.size(), 2U);
    EXPECT_NE(std::find(cfg_arr.begin(), cfg_arr.end(), VALUE_IFC1), cfg_arr.end());
@@ -835,7 +858,41 @@ TEST_F(Drec_err, zeroSizeStr)
 }
 
 
+class Drec_err : public Drec_base {
+protected:
+    /// Before each Test case
+    void SetUp() override {
+        Drec_base::SetUp();
+
+        // Prepare an IPFIX Template
+        ipfix_trec trec{256};
+        trec.add_field(1001,2);             // myBool
+
+        // Prepare an IPFIX Data Record
+        ipfix_drec drec{};
+        drec.append_bool(VALUE_MY_BOOL);
+
+        register_template(trec);
+        drec_create(256, drec);
+    }
+
+    bool        VALUE_MY_BOOL    = true;
+
+};
+
+// Test for
+TEST_F(Drec_err, uvalidBoolSize)
+{
+    constexpr size_t BSIZE = 2U;
+    char* buff = (char*) malloc(BSIZE);
+    uint32_t flags = FDS_CD2J_ALLOW_REALLOC;
+    size_t buff_size = BSIZE;
+
+    int rc = fds_drec2json(&m_drec, flags, &buff, &buff_size);
+    ASSERT_GT(rc, FDS_ERR_ARG);
+    std::cout << buff << std::endl;
+    free(buff);
+}
 /* TODO
-    Test for flags with size 2
 
 */
