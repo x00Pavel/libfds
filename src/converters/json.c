@@ -734,7 +734,6 @@ to_blist (struct context *buffer, const struct fds_drec_field *field)
         break;
     }
 
-
     if (ret_code != FDS_OK){
         return ret_code;
     }
@@ -754,7 +753,7 @@ to_blist (struct context *buffer, const struct fds_drec_field *field)
 
     // Add vaules from list
     while (fds_blist_iter_next(&blist_iter) != FDS_EOC) {
-        if (added != 0) {
+        if (added > 0) {
             // Add comma
             ret_code = buffer_append(buffer,",");
             if (ret_code != FDS_OK){
@@ -778,7 +777,7 @@ to_blist (struct context *buffer, const struct fds_drec_field *field)
         case FDS_OK:
             added++;
             continue;
-            default:
+        default:
             // Other erros -> completly out
             return ret_code;
         }
@@ -1045,7 +1044,7 @@ fds_drec2json(const struct fds_drec *rec, uint32_t flags, const fds_iemgr_t *ie_
     *str = record.buffer_begin;
     *str_size = buffer_alloc(&record);
 
-    ret_code = buffer_append(&record,"}\n"); // This also adds '\0'
+    ret_code = buffer_append(&record,"}"); // This also adds '\0'
     if(ret_code != FDS_OK){
         goto error;
     }
