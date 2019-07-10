@@ -784,6 +784,7 @@ iter_loop(const struct fds_drec *rec, struct context *buffer)
     converter_fn fn;
     unsigned int added = 0;
     int ret_code;
+
     // Try to convert each field in the record
     uint16_t iter_flag = (buffer->flags & FDS_CD2J_IGNORE_UNKNOWN) ? FDS_DREC_UNKNOWN_SKIP : 0;
 
@@ -805,7 +806,7 @@ iter_loop(const struct fds_drec *rec, struct context *buffer)
         // Separate fields
         if (added != 0) {
             // Add comma
-            ret_code = buffer_append(buffer,",");
+            ret_code = buffer_append(buffer, ",");
             if (ret_code != FDS_OK){
                 return ret_code;
             }
@@ -853,6 +854,8 @@ iter_loop(const struct fds_drec *rec, struct context *buffer)
             if (ret_code != FDS_OK){
                 return ret_code;
             }
+            __attribute__ ((fallthrough)); // only for purpose to avoid warning "this statement may fall through"
+
         case FDS_OK:
             added++;
             continue;
@@ -885,7 +888,7 @@ to_blist (struct context *buffer, const struct fds_drec_field *field)
         return ret_code;
     }
 
-    fds_blist_iter_init(&blist_iter, field, buffer->mgr);
+    fds_blist_iter_init(&blist_iter, (struct fds_drec_field *) field, buffer->mgr);
 
     // Add sematic
     switch (blist_iter.semantic) {
@@ -948,8 +951,8 @@ to_blist (struct context *buffer, const struct fds_drec_field *field)
             if (ret_code != FDS_OK){
                 return ret_code;
             }
-            // It can fall throught
-        case FDS_OK:
+            __attribute__ ((fallthrough)); // only for purpose to avoid warning "this statement may fall through"
+         case FDS_OK:
             added++;
             continue;
         default:
@@ -969,7 +972,7 @@ to_blist (struct context *buffer, const struct fds_drec_field *field)
 }
 
 /*
-* \brief Procces subTemplateList data type
+* \brief Procces subTemplateList datatype
 *
 * \param[in] field An IPFIX field to convert
 * \param[in] buffer Buffer
@@ -989,13 +992,11 @@ to_stlist(struct context *buffer, const struct fds_drec_field *field)
     }
     // Try to convert each field in the record
     uint16_t iter_flag = (buffer->flags & FDS_CD2J_IGNORE_UNKNOWN) ? FDS_DREC_UNKNOWN_SKIP : 0;
-
     // If flag FDS_CD2J_BIFLOW_REVERSE is set,
     // then will be added flag FDS_DREC_BIFLOW_REV for every field
     iter_flag |= (buffer->flags & FDS_CD2J_BIFLOW_REVERSE) ? FDS_DREC_BIFLOW_REV : 0;
 
-
-    fds_stlist_iter_init(&stlist_iter, field, buffer->snap, iter_flag);
+    fds_stlist_iter_init(&stlist_iter, (struct fds_drec_field *)field, buffer->snap, iter_flag);
 
     // Add sematic
     switch (stlist_iter.semantic) {
@@ -1118,8 +1119,6 @@ add_field_name(struct context *buffer, const struct fds_drec_field *field)
 
     return FDS_OK;
 }
-
-
 
 int
 fds_drec2json(const struct fds_drec *rec, uint32_t flags, const fds_iemgr_t *ie_mgr, char **str,
