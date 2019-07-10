@@ -729,6 +729,8 @@ int
 add_field_name(struct context *buffer, const struct fds_drec_field *field);
 int
 to_stlist(struct context *buffer, const struct fds_drec_field *field);
+int
+to_stMulList(struct context *buffer, const struct fds_drec_field *field);
 
 /**
  * \brief Find a conversion function for an IPFIX field
@@ -761,7 +763,8 @@ get_converter(const struct fds_drec_field *field)
         &to_ip,       // FDS_ET_IPV4_ADDRESS
         &to_ip,       // FDS_ET_IPV6_ADDRESS
         &to_blist,    // FDS_ET_BASIC_LIST
-        &to_stlist    // subTemplateList
+        &to_stlist,   // subTemplateList
+        &to_stMulList // subTemplteMultiList
         // Other types are not supported yet
     };
 
@@ -926,7 +929,6 @@ to_blist (struct context *buffer, const struct fds_drec_field *field)
 
     // Add sematic
     ret_code = add_sematic(buffer, blist_iter.semantic);
-
     if (ret_code != FDS_OK){
         return ret_code;
     }
@@ -1016,7 +1018,6 @@ to_stlist(struct context *buffer, const struct fds_drec_field *field)
 
     // Add sematic
     ret_code = add_sematic(buffer, stlist_iter.semantic);
-
     if (ret_code != FDS_OK){
         return ret_code;
     }
@@ -1025,7 +1026,6 @@ to_stlist(struct context *buffer, const struct fds_drec_field *field)
     if (ret_code != FDS_OK){
         return ret_code;
     }
-
 
     // Add vaules from list
     while (fds_stlist_iter_next(&stlist_iter) == FDS_OK) {
@@ -1064,6 +1064,104 @@ to_stlist(struct context *buffer, const struct fds_drec_field *field)
     return FDS_OK;
 }
 
+/*
+* \brief Procces subTemplteMultiList datatype
+*
+* \param[in] field An IPFIX field to convert
+* \param[in] buffer Buffer
+* \return #FDS_OK on success
+* \return ret_code in case of memory allocation error
+*/
+int
+to_stMulList(struct context *buffer, const struct fds_drec_field *field)
+{
+    int ret_code;
+    struct fds_stmlist_iter stMulList_iter;
+
+    ret_code = buffer_append(buffer,"{\"@type\":\"subTemplateMultiList\",\"semantic\":\"");
+    if (ret_code != FDS_OK){
+        return ret_code;
+    }
+    // Try to convert each field in the record
+    uint16_t iter_flag = (buffer->flags & FDS_CD2J_IGNORE_UNKNOWN) ? FDS_DREC_UNKNOWN_SKIP : 0;
+    // If flag FDS_CD2J_BIFLOW_REVERSE is set,
+    // then will be added flag FDS_DREC_BIFLOW_REV for every field
+    iter_flag |= (buffer->flags & FDS_CD2J_BIFLOW_REVERSE) ? FDS_DREC_BIFLOW_REV : 0;
+
+    fds_stmlist_iter_init(&stMulList_iter, (struct fds_drec_field *)field, buffer->snap, iter_flag);
+
+    // Add sematic
+    ret_code = add_sematic(buffer, stMulList_iter.semantic);
+    if (ret_code != FDS_OK){
+        return ret_code;
+    }
+
+    ret_code = buffer_append(buffer,"\",\"data\":[");
+    if (ret_code != FDS_OK){
+        return ret_code;
+    }
+
+    // Loop for blocks from list
+    int added = 0;
+    while (fds_stmlist_iter_next_block(&stMulList_iter) == FDS_OK) {
+        // Separate fields
+        if (added > 0) {
+            // Add comma
+            ret_code = buffer_append(buffer,",");
+            if (ret_code != FDS_OK){
+                return ret_code;
+            }
+        }
+        // Add opening bracket for block
+        ret_code = buffer_append(buffer,"[");
+        if (ret_code != FDS_OK){
+            return ret_code;
+        }
+
+        // Loop for individual elements throught block
+        int added_in_block = 0;
+        while (fds_stmlist_iter_next_rec(&stMulList_iter) == FDS_OK) {
+            // Separate fields
+            if (added_in_block > 0) {
+                // Add comma
+                ret_code = buffer_append(buffer,",");
+                if (ret_code != FDS_OK){
+                    return ret_code;
+                }
+            }
+            // Add opening bracket for element
+            ret_code = buffer_append(buffer,"{");
+            if (ret_code != FDS_OK){
+                return ret_code;
+            }
+
+            ret_code = iter_loop(&stMulList_iter.rec, buffer);
+            if (ret_code != FDS_OK) {
+                return ret_code;
+            }
+
+            // Add opening bracket for element
+            ret_code = buffer_append(buffer,"}");
+            if (ret_code != FDS_OK){
+                return ret_code;
+            }
+        }
+
+        // Add closing bracket for block
+        ret_code = buffer_append(buffer,"]");
+        if (ret_code != FDS_OK){
+            return ret_code;
+        }
+    }
+
+    // Add closing bracket for field
+    ret_code = buffer_append(buffer,"]");
+    if (ret_code != FDS_OK){
+        return ret_code;
+    }
+
+    return FDS_OK;
+}
 /**
  * \brief Append the buffer with a name of an Information Element
  *
