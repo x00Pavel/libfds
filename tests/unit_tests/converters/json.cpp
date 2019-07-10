@@ -590,7 +590,7 @@ TEST_F(Drec_extra, testTypes)
     constexpr size_t BSIZE = 10U;
     char* buff = (char*) malloc(BSIZE);
     uint32_t flags = FDS_CD2J_ALLOW_REALLOC;
-    size_t buff_size = BSIZE;
+    size_t buff_size = BSIZE;//
 
     int rc = fds_drec2json(&m_drec, flags, m_iemgr.get(), &buff, &buff_size);
     ASSERT_GT(rc, 0);
@@ -807,10 +807,6 @@ protected:
     uint16_t    VALUE_DST_PORT   = 80;
     bool        VALUE_MY_BOOL    = true;
 
-    // drec.append_datetime(VALUE_TS_FST, FDS_ET_DATE_TIME_NANOSECONDS);
-
-    // uint64_t    VALUE_TS_FST   = 1522670362000ULL;
-
 };
 
 //  Test for adding null in case of unvalid field
@@ -900,6 +896,10 @@ protected:
         trec.add_field(484, ipfix_trec::SIZE_VAR); // bgpSourceCommunityList (empty)
         trec.add_field(485, ipfix_trec::SIZE_VAR); // bgpDestinationCommunityList (non-empty)
         trec.add_field(291, ipfix_trec::SIZE_VAR); // basicList (of observationDomainName strings)
+        trec.add_field(487, ipfix_trec::SIZE_VAR); // bgpSourceExtendedCommunityList (empty)
+        trec.add_field(488, ipfix_trec::SIZE_VAR); // bgpDestinationExtendedCommunityList (empty)
+        trec.add_field(490, ipfix_trec::SIZE_VAR); // bgpSourceLargeCommunityList (empty)
+        trec.add_field(491, ipfix_trec::SIZE_VAR); // bgpDestinationLargeCommunityList (empty)
 
         // Prepare an empty basicList (i.e. bgpSourceCommunityList of bgpCommunity)
         ipfix_blist blist_empty;
@@ -921,6 +921,26 @@ protected:
         blist_multi.header_short(FDS_IPFIX_LIST_UNDEFINED, 300, FDS_IPFIX_VAR_IE_LEN);
         blist_multi.append_field(fields_multi);
 
+        //
+        ipfix_field fields_oneof;
+        fields_oneof.append_uint(VALUE_MY_BOOL, 4);
+        ipfix_blist blist_oneof;
+        blist_oneof.header_short(FDS_IPFIX_LIST_EXACTLY_ONE_OF, 1001, 4);
+        blist_oneof.append_field(fields_oneof);
+
+        ipfix_blist blist_one_or_more;
+        blist_one_or_more.header_short(FDS_IPFIX_LIST_ONE_OR_MORE_OF, 488, 4);
+
+        ipfix_blist blist_order;
+        blist_order.header_short(FDS_IPFIX_LIST_ORDERED, 490, 4);
+
+        ipfix_field fields_octet;
+        fields_octet.append_octets(VALUE_APP_ID1.c_str(),(uint16_t)10, false);
+        fields_octet.append_octets(VALUE_APP_ID2.c_str(),(uint16_t)10, false);
+        ipfix_blist blist_octet;
+        blist_octet.header_short(FDS_IPFIX_LIST_UNDEFINED, 1110, 10);
+        blist_octet.append_field(fields_octet);
+
         // Prepare an IPFIX Data Record
         ipfix_drec drec{};
         drec.append_ip(VALUE_SRC_IP4);
@@ -934,20 +954,31 @@ protected:
         drec.append_blist(blist_one);
         drec.var_header(blist_multi.size()); // basicList
         drec.append_blist(blist_multi);
+        drec.var_header(blist_oneof.size()); // bgpSourceExtendedCommunityList
+        drec.append_blist(blist_oneof);
+        drec.var_header(blist_one_or_more.size()); // bgpDestinationExtendedCommunityList
+        drec.append_blist(blist_one_or_more);
+        drec.var_header(blist_order.size()); // bgpSourceLargeCommunityList
+        drec.append_blist(blist_order);
+        drec.var_header(blist_octet.size()); // bgpDestinationLargeCommunityList
+        drec.append_blist(blist_octet);
 
         register_template(trec);
         drec_create(256, drec);
     }
-
-    uint32_t    VALUE_BGP_DST    =    23;
+    uint32_t    VALUE_BGP_DST    = 23;
+    std::string VALUE_UNV_STR    = "\x33";
     std::string VALUE_BLIST_STR1 = "RandomString";
     std::string VALUE_BLIST_STR2 = "";
     std::string VALUE_BLIST_STR3 = "Another non-empty string";
     std::string VALUE_SRC_IP4    = "127.0.0.1";
     std::string VALUE_DST_IP4    = "8.8.8.8";
+    std::string VALUE_APP_ID1     = "\x33\x23\x24\x30\x31\x32\x34\x35\x36\x37"; // 3#$0124567
+    std::string VALUE_APP_ID2     = "\x33\x23\x24\x30\x31\x32\x34\x35\x36\x37"; // 3#$0124567
     uint16_t    VALUE_SRC_PORT   = 65000;
     uint16_t    VALUE_DST_PORT   = 80;
     uint8_t     VALUE_PROTO      = 6; // TCP
+    bool        VALUE_MY_BOOL    = 21;
 };
 
 TEST_F(Drec_basicLists, simple)
@@ -985,23 +1016,60 @@ TEST_F(Drec_basicLists, rightValues)
     auto& src_obj = cfg["iana:bgpSourceCommunityList"];
     auto& dst_obj = cfg["iana:bgpDestinationCommunityList"];
     auto& basic_obj = cfg["iana:basicList"];
+    auto& ext_src_obj = cfg["iana:bgpSourceExtendedCommunityList"];
+    auto& octet_obj = cfg["iana:bgpDestinationLargeCommunityList"];
 
-
-    EXPECT_EQ(src_obj["semantic"], "noneOf");
-    EXPECT_EQ(dst_obj["semantic"], "allOf");
-    EXPECT_EQ(basic_obj["semantic"], "undefined");
 
     EXPECT_TRUE(src_obj["data"].is_array());
     EXPECT_TRUE(dst_obj["data"].is_array());
     EXPECT_TRUE(basic_obj["data"].is_array());
+    EXPECT_TRUE(octet_obj["data"].is_array());
+    EXPECT_TRUE(ext_src_obj["data"].is_array());
 
     auto dst_data_arr = dst_obj["data"].as_array();
     auto basic_data_arr = basic_obj["data"].as_array();
+    auto octet_data_arr = octet_obj["data"].as_array();
+    auto ext_src_data_arr = ext_src_obj["data"].as_array();
 
     EXPECT_NE(std::find(dst_data_arr.begin(), dst_data_arr.end(), VALUE_BGP_DST), dst_data_arr.end());
     EXPECT_NE(std::find(basic_data_arr.begin(), basic_data_arr.end(), VALUE_BLIST_STR1), basic_data_arr.end());
     EXPECT_NE(std::find(basic_data_arr.begin(), basic_data_arr.end(), VALUE_BLIST_STR2), basic_data_arr.end());
     EXPECT_NE(std::find(basic_data_arr.begin(), basic_data_arr.end(), VALUE_BLIST_STR3), basic_data_arr.end());
+    EXPECT_EQ(std::find(octet_data_arr.begin(), octet_data_arr.end(), VALUE_APP_ID1), octet_data_arr.end());
+    EXPECT_EQ(std::find(octet_data_arr.begin(), octet_data_arr.end(), VALUE_APP_ID2), octet_data_arr.end());
+    EXPECT_NE(std::find(ext_src_data_arr.begin(), ext_src_data_arr.end(), nullptr), ext_src_data_arr.end());
+
+    free(buffer);
+}
+
+TEST_F(Drec_basicLists, sematic)
+{
+    size_t buffer_size = 2U;
+    char* buffer = (char*) malloc(buffer_size);
+    uint32_t flags = FDS_CD2J_ALLOW_REALLOC;
+
+    auto iemgr = m_iemgr.get();
+    int rc = fds_drec2json(&m_drec, flags, iemgr, &buffer, &buffer_size);
+    ASSERT_GT(rc, 0);
+    ASSERT_NE(buffer, nullptr);
+    EXPECT_NE(buffer_size, 0U);
+    EXPECT_EQ(strlen(buffer), size_t(rc));
+    Config cfg = parse_string(buffer, JSON, "drec2json");
+
+    auto& src_obj = cfg["iana:bgpSourceCommunityList"];
+    auto& dst_obj = cfg["iana:bgpDestinationCommunityList"];
+    auto& basic_obj = cfg["iana:basicList"];
+    auto& ext_src_obj = cfg["iana:bgpSourceExtendedCommunityList"];
+    auto& ext_dst_obj = cfg["iana:bgpDestinationExtendedCommunityList"];
+    auto& lrg_src_obj = cfg["iana:bgpSourceLargeCommunityList"];
+
+
+    EXPECT_EQ(src_obj["semantic"], "noneOf");
+    EXPECT_EQ(dst_obj["semantic"], "allOf");
+    EXPECT_EQ(basic_obj["semantic"], "undefined");
+    EXPECT_EQ(ext_src_obj["semantic"], "exactlyOneOf");
+    EXPECT_EQ(ext_dst_obj["semantic"], "oneOrMoreOf");
+    EXPECT_EQ(lrg_src_obj["semantic"], "ordered");
 
     free(buffer);
 }
@@ -1033,7 +1101,6 @@ TEST_F(Drec_basicLists, allocLoop)
     }
 
     free(buffer);
-
 }
 
 /* TODO
