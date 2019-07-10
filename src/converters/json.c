@@ -727,6 +727,8 @@ int
 to_blist (struct context *buffer, const struct fds_drec_field *field);
 int
 add_field_name(struct context *buffer, const struct fds_drec_field *field);
+int
+to_stlist(struct context *buffer, const struct fds_drec_field *field);
 
 /**
  * \brief Find a conversion function for an IPFIX field
@@ -758,7 +760,8 @@ get_converter(const struct fds_drec_field *field)
         &to_datetime, // FDS_ET_DATE_TIME_NANOSECONDS
         &to_ip,       // FDS_ET_IPV4_ADDRESS
         &to_ip,       // FDS_ET_IPV6_ADDRESS
-        &to_blist     // FDS_ET_BASIC_LIST
+        &to_blist,    // FDS_ET_BASIC_LIST
+        &to_stlist    // subTemplateList
         // Other types are not supported yet
     };
 
@@ -867,7 +870,38 @@ iter_loop(const struct fds_drec *rec, struct context *buffer)
 
     return FDS_OK;
 }
+/* \breaf Function for adding seamntic for strucutred datatype
+ * \param[in] buffer Buffer
+ * \param[in] sematic Sematic value
+ *
+ * \return ret_code
+ */
+int
+add_sematic(struct context *buffer, int semantic) {
+    int ret_code;
 
+    switch (semantic) {
+    case FDS_IPFIX_LIST_NONE_OF:
+        ret_code = buffer_append(buffer, "noneOf");
+        break;
+    case FDS_IPFIX_LIST_EXACTLY_ONE_OF:
+        ret_code = buffer_append(buffer, "exactlyOneOf");
+        break;
+    case FDS_IPFIX_LIST_ONE_OR_MORE_OF:
+        ret_code = buffer_append(buffer, "oneOrMoreOf");
+        break;
+    case FDS_IPFIX_LIST_ALL_OF:
+        ret_code = buffer_append(buffer, "allOf");
+        break;
+    case FDS_IPFIX_LIST_ORDERED:
+        ret_code = buffer_append(buffer, "ordered");
+        break;
+    default:
+        ret_code = buffer_append(buffer, "undefined");
+        break;
+    }
+    return ret_code;
+}
 /**
  * \brief Procces basicList data type
  *
@@ -891,26 +925,7 @@ to_blist (struct context *buffer, const struct fds_drec_field *field)
     fds_blist_iter_init(&blist_iter, (struct fds_drec_field *) field, buffer->mgr);
 
     // Add sematic
-    switch (blist_iter.semantic) {
-    case FDS_IPFIX_LIST_NONE_OF:
-        ret_code = buffer_append(buffer, "noneOf");
-        break;
-    case FDS_IPFIX_LIST_EXACTLY_ONE_OF:
-        ret_code = buffer_append(buffer, "exactlyOneOf");
-        break;
-    case FDS_IPFIX_LIST_ONE_OR_MORE_OF:
-        ret_code = buffer_append(buffer, "oneOrMoreOf");
-        break;
-    case FDS_IPFIX_LIST_ALL_OF:
-        ret_code = buffer_append(buffer, "allOf");
-        break;
-    case FDS_IPFIX_LIST_ORDERED:
-        ret_code = buffer_append(buffer, "ordered");
-        break;
-    default:
-        ret_code = buffer_append(buffer, "undefined");
-        break;
-    }
+    ret_code = add_sematic(buffer, blist_iter.semantic);
 
     if (ret_code != FDS_OK){
         return ret_code;
@@ -990,6 +1005,7 @@ to_stlist(struct context *buffer, const struct fds_drec_field *field)
     if (ret_code != FDS_OK){
         return ret_code;
     }
+
     // Try to convert each field in the record
     uint16_t iter_flag = (buffer->flags & FDS_CD2J_IGNORE_UNKNOWN) ? FDS_DREC_UNKNOWN_SKIP : 0;
     // If flag FDS_CD2J_BIFLOW_REVERSE is set,
@@ -999,26 +1015,7 @@ to_stlist(struct context *buffer, const struct fds_drec_field *field)
     fds_stlist_iter_init(&stlist_iter, (struct fds_drec_field *)field, buffer->snap, iter_flag);
 
     // Add sematic
-    switch (stlist_iter.semantic) {
-    case FDS_IPFIX_LIST_NONE_OF:
-        ret_code = buffer_append(buffer, "noneOf");
-        break;
-    case FDS_IPFIX_LIST_EXACTLY_ONE_OF:
-        ret_code = buffer_append(buffer, "exactlyOneOf");
-        break;
-    case FDS_IPFIX_LIST_ONE_OR_MORE_OF:
-        ret_code = buffer_append(buffer, "oneOrMoreOf");
-        break;
-    case FDS_IPFIX_LIST_ALL_OF:
-        ret_code = buffer_append(buffer, "allOf");
-        break;
-    case FDS_IPFIX_LIST_ORDERED:
-        ret_code = buffer_append(buffer, "ordered");
-        break;
-    default:
-        ret_code = buffer_append(buffer, "undefined");
-        break;
-    }
+    ret_code = add_sematic(buffer, stlist_iter.semantic);
 
     if (ret_code != FDS_OK){
         return ret_code;
