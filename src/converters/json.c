@@ -1053,10 +1053,11 @@ to_stlist(struct context *buffer, const struct fds_drec_field *field)
         if (ret_code != FDS_OK){
             return ret_code;
         }
+        added++;
 
     }
 
-    ret_code = buffer_append(buffer,"]");
+    ret_code = buffer_append(buffer,"]}");
     if (ret_code != FDS_OK){
         return ret_code;
     }
@@ -1145,6 +1146,7 @@ to_stMulList(struct context *buffer, const struct fds_drec_field *field)
             if (ret_code != FDS_OK){
                 return ret_code;
             }
+            added_in_block++;
         }
 
         // Add closing bracket for block
@@ -1152,6 +1154,7 @@ to_stMulList(struct context *buffer, const struct fds_drec_field *field)
         if (ret_code != FDS_OK){
             return ret_code;
         }
+        added++;
     }
 
     // Add closing bracket for field
