@@ -1103,6 +1103,131 @@ TEST_F(Drec_basicLists, allocLoop)
     free(buffer);
 }
 
+// -------------------------------------------------------------------------------------------------
+/// IPFIX Data Record with subTemplateList
+class Drec_subTemplateList : public Drec_base {
+protected:
+    /// Before each Test case
+    void SetUp() override {
+        Drec_base::SetUp();
+
+        // Prepare an IPFIX Template
+        ipfix_trec trec{256};
+        trec.add_field(  7, 2);                    // sourceTransportPort
+        trec.add_field( 27, 16);                   // sourceIPv6Address
+        trec.add_field( 11, 2);                    // destinationTransportPort
+        trec.add_field( 28, 16);                   // destinationIPv6Address
+        trec.add_field(  4, 1);                    // protocolIdentifier
+        trec.add_field(292, ipfix_trec::SIZE_VAR); // subTemplateList
+
+        // Prepare an IPFIX Template for the subTemplateList
+        ipfix_trec sub_trec{257};
+        sub_trec.add_field(459, ipfix_trec::SIZE_VAR); // httpRequestMethod (string)
+        sub_trec.add_field(461, ipfix_trec::SIZE_VAR); // httpRequestTarget (string)
+        sub_trec.add_field(1001, 1);                   // myBool
+
+        // Prepare few Data Records based on the subTemplateList
+        ipfix_drec sub_rec_v1;
+        sub_rec_v1.append_string(VALUE_HTTP_METHOD1);
+        sub_rec_v1.append_string(VALUE_HTTP_TARGET1);
+        sub_rec_v1.append_uint(VALUE_MY_BOLL, 1);
+        ipfix_drec sub_rec_v2;
+        sub_rec_v2.append_string(VALUE_HTTP_METHOD2);
+        sub_rec_v2.append_string(VALUE_HTTP_TARGET2);
+        sub_rec_v2.append_uint(VALUE_MY_BOLL, 1);
+
+        // Prepare a subTemplate field with "sub" Data Records
+        ipfix_stlist st_list;
+        st_list.subTemp_header(FDS_IPFIX_LIST_ALL_OF, 257U);
+        st_list.append_data_record(sub_rec_v1);
+        st_list.append_data_record(sub_rec_v2);
+
+        // Prepare an IPFIX Data Record
+        ipfix_drec drec{};
+        drec.append_uint(VALUE_SRC_PORT, 2);
+        drec.append_ip(VALUE_SRC_IP6);
+        drec.append_uint(VALUE_DST_PORT, 2);
+        drec.append_ip(VALUE_DST_IP6);
+        drec.append_uint(VALUE_PROTO, 1);
+        drec.var_header(st_list.size());
+        drec.append_stlist(st_list);
+
+        register_template(trec);
+        register_template(sub_trec);
+        drec_create(256, drec);
+    }
+
+    std::string VALUE_SRC_IP6  = "2001:db8::2:1";
+    std::string VALUE_DST_IP6  = "fe80::fea9:6fc4:2e98:cdb2";
+    uint16_t    VALUE_SRC_PORT = 1234;
+    uint16_t    VALUE_DST_PORT = 8754;
+    uint8_t     VALUE_PROTO    = 17; // UDP
+    bool        VALUE_MY_BOLL  = 10;
+
+    std::string VALUE_HTTP_METHOD1 = "GET";
+    std::string VALUE_HTTP_METHOD2 = "POST";
+    std::string VALUE_HTTP_TARGET1 = "/api/example/";
+    std::string VALUE_HTTP_TARGET2 = "/api/article/";
+};
+
+// TODO
+TEST_F(Drec_subTemplateList, simple)
+{
+    size_t buffer_size = 2U;
+    char* buffer = (char*) malloc(buffer_size);
+    uint32_t flags = FDS_CD2J_ALLOW_REALLOC;
+
+    auto iemgr = m_iemgr.get();
+    int rc = fds_drec2json(&m_drec, flags, iemgr, &buffer, &buffer_size);
+    ASSERT_GT(rc, 0);
+    ASSERT_NE(buffer, nullptr);
+    EXPECT_NE(buffer_size, 0U);
+    EXPECT_EQ(strlen(buffer), size_t(rc));
+
+    free(buffer);
+}
+
+TEST_F(Drec_subTemplateList, values)
+{
+    size_t buffer_size = 2U;
+    char* buffer = (char*) malloc(buffer_size);
+    uint32_t flags = FDS_CD2J_ALLOW_REALLOC;
+
+    auto iemgr = m_iemgr.get();
+    int rc = fds_drec2json(&m_drec, flags, iemgr, &buffer, &buffer_size);
+    ASSERT_GT(rc, 0);
+    ASSERT_NE(buffer, nullptr);
+    EXPECT_NE(buffer_size, 0U);
+    EXPECT_EQ(strlen(buffer), size_t(rc));
+    Config cfg = parse_string(buffer, JSON, "drec2json");
+
+    ASSERT_TRUE(cfg["iana:subTemplateList"].is_object());
+    auto& stlist_obj = cfg["iana:subTemplateList"];
+
+    EXPECT_TRUE(stlist_obj["data"].is_array());
+    auto stlist_arr = stlist_obj["data"].as_array();
+    ASSERT_EQ(stlist_arr.size(),2U);
+
+    for (int i = 0; i < 2; i++){
+        ASSERT_TRUE(stlist_arr[i].is_object());
+    }
+    auto& obj0 = stlist_arr[0];
+    EXPECT_EQ(obj0["iana:httpRequestMethod"], VALUE_HTTP_METHOD1);
+    EXPECT_EQ(obj0["iana:httpRequestTarget"], VALUE_HTTP_TARGET1);
+
+    auto& obj1 = stlist_arr[1];
+    EXPECT_EQ(obj1["iana:httpRequestMethod"], VALUE_HTTP_METHOD2);
+    EXPECT_EQ(obj1["iana:httpRequestTarget"], VALUE_HTTP_TARGET2);
+
+    std::cout << cfg << '\n';
+
+    free(buffer);
+}
+
+
+
+
+
 /* TODO
 
 */
