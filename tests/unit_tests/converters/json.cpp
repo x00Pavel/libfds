@@ -1238,36 +1238,45 @@ protected:
             trec.add_field( 82, ipfix_trec::SIZE_VAR); // interfaceName
             trec.add_field(293, ipfix_trec::SIZE_VAR); // subTemplateMultiList
 
-            // Prepare first templeta
+            // Prepare 1. templeta
             ipfix_trec sub_trec1{257};
             sub_trec1.add_field(1002, 8); // myInt
             sub_trec1.add_field(1004, 8); // myMInf
-            // Prepare second templeta
+            // Prepare 2. templeta
             ipfix_trec sub_trec2{258};
             sub_trec2.add_field(56, 6); // sourceMacAddress
-            sub_trec2.add_field( 94, ipfix_trec::SIZE_VAR);// applicationDescription (string)
+            sub_trec2.add_field(94, ipfix_trec::SIZE_VAR);// applicationDescription (string)
+            // Prepare 3. templeta
+            // ipfix_trec sub_trec{259};
+            // sub_trec3.add_field(459, ipfix_trec::SIZE_VAR); // httpRequestMethod (string)
+            // sub_trec3.add_field(461, ipfix_trec::SIZE_VAR); // httpRequestTarget (string)
+            // sub_trec3.add_field(1001, 1);                   // myBool
 
             // Prepare first record
-            ipfix_drec sub_drec1{};
-            sub_drec1.append_uint(VALUE_MY_INT, 8);
+            ipfix_drec sub_drec1;
+            sub_drec1.append_uint(VALUE_MY_INT1, 8);
             sub_drec1.append_float(VALUE_MY_PINF,8);
             // Prepare second record
-            ipfix_drec sub_drec2{};
-            sub_drec2.append_mac(VALUE_SRC_MAC);
-            sub_drec2.append_string(VALUE_APP_DES);
+            ipfix_drec sub_drec2;
+            sub_drec2.append_uint(VALUE_MY_INT2, 8);
+            sub_drec2.append_float(VALUE_MY_PINF,8);;
+            ipfix_drec sub_drec3;
+            sub_drec3.append_mac(VALUE_SRC_MAC);
+            sub_drec3.append_string(VALUE_APP_DES);
 
             // Prepare a subTemplteMultiList field with subTemplateList
             ipfix_stlist stm_list;
             stm_list.subTempMulti_header(FDS_IPFIX_LIST_ALL_OF);
-            stm_list.subTempMulti_data_hdr(257, sub_drec1.size());
+            stm_list.subTempMulti_data_hdr(257, sub_drec1.size() + sub_drec2.size() );
             stm_list.append_data_record(sub_drec1);
-            stm_list.subTempMulti_data_hdr(258, sub_drec2.size());
             stm_list.append_data_record(sub_drec2);
+            stm_list.subTempMulti_data_hdr(258, sub_drec3.size());
+            stm_list.append_data_record(sub_drec3);
 
             ipfix_drec drec{};
             drec.append_ip(VALUE_SRC_IP4);
-            drec.append_uint(VALUE_SRC_PORT, 4);
-            drec.append_uint(VALUE_DST_PORT, 4);
+            drec.append_uint(VALUE_SRC_PORT, 2);
+            drec.append_uint(VALUE_DST_PORT, 2);
             drec.append_string(VALUE_INF_NAME);
             drec.var_header(stm_list.size());
             drec.append_stlist(stm_list);
@@ -1278,7 +1287,9 @@ protected:
             drec_create(256, drec);
 
         }
-        signed      VALUE_MY_INT     = 1006;
+
+        signed      VALUE_MY_INT1     = 1006;
+        signed      VALUE_MY_INT2     = 10000006;
         double      VALUE_MY_PINF    = std::numeric_limits<double>::infinity();
         std::string VALUE_SRC_MAC    = "01:12:1F:13:11:8A";
         std::string VALUE_APP_DES    = "web\\\nclose\t\"open\bdog\fcat\r\"\x13";
@@ -1301,6 +1312,49 @@ TEST_F(Drec_subTemplateMultiList, simple)
     ASSERT_NE(buffer, nullptr);
     EXPECT_NE(buffer_size, 0U);
     EXPECT_EQ(strlen(buffer), size_t(rc));
+
+    free(buffer);
+}
+
+TEST_F(Drec_subTemplateMultiList, values)
+{
+    size_t buffer_size = 2U;
+    char* buffer = (char*) malloc(buffer_size);
+    uint32_t flags = FDS_CD2J_ALLOW_REALLOC;
+
+    auto iemgr = m_iemgr.get();
+    int rc = fds_drec2json(&m_drec, flags, iemgr, &buffer, &buffer_size);
+    ASSERT_GT(rc, 0);
+    ASSERT_NE(buffer, nullptr);
+    EXPECT_NE(buffer_size, 0U);
+    EXPECT_EQ(strlen(buffer), size_t(rc));
+    Config cfg = parse_string(buffer, JSON, "drec2json");
+
+    // std::cout << cfg << '\n';
+    EXPECT_TRUE(cfg["iana:subTemplateMultiList"].is_object());
+
+    auto& cfg_obj = cfg["iana:subTemplateMultiList"];
+    ASSERT_TRUE(cfg_obj["data"].is_array());
+    auto cfg_arr = cfg_obj["data"].as_array();
+
+    for (int i = 0; i < 2; i++){
+        ASSERT_TRUE(cfg_arr[i].is_array());
+    }
+
+    auto main_arr1 = cfg_arr[0].as_array();
+
+    auto& obj1_1 = main_arr1[0];
+    EXPECT_EQ(obj1_1["iana:myInt"], VALUE_MY_INT1);
+    EXPECT_EQ(obj1_1["iana:myPInf"], "Infinity");
+
+    auto& obj1_2 = main_arr1[1];
+    EXPECT_EQ(obj1_2["iana:myInt"], VALUE_MY_INT2);
+    EXPECT_EQ(obj1_2["iana:myPInf"], "Infinity");
+
+    auto main_arr2 = cfg_arr[1].as_array();
+    auto& obj2_1 = main_arr2[0];
+    EXPECT_EQ(obj2_1["iana:sourceMacAddress"], VALUE_SRC_MAC);
+    EXPECT_EQ(obj2_1["iana:applicationDescription"], VALUE_APP_DES);
 
     free(buffer);
 }
