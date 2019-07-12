@@ -1158,7 +1158,7 @@ to_stMulList(struct context *buffer, const struct fds_drec_field *field)
     }
 
     // Add closing bracket for field
-    ret_code = buffer_append(buffer,"]");
+    ret_code = buffer_append(buffer,"]}");
     if (ret_code != FDS_OK){
         return ret_code;
     }
