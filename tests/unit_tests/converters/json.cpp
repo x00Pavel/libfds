@@ -507,6 +507,8 @@ protected:
         ipfix_trec trec{256};
         trec.add_field(84,ipfix_trec::SIZE_VAR); //samplerName1
         trec.add_field(84,ipfix_trec::SIZE_VAR); //samplerName2
+        trec.add_field(84,ipfix_trec::SIZE_VAR); //samplerName3
+        trec.add_field(84,ipfix_trec::SIZE_VAR); //samplerName4
         trec.add_field(83,ipfix_trec::SIZE_VAR); //interfaceDescription
         trec.add_field( 94, ipfix_trec::SIZE_VAR);// applicationDescription (string)
         trec.add_field(  8, 4);             // sourceIPv4Address
@@ -533,8 +535,10 @@ protected:
 
         // Prepare an IPFIX Data Record
         ipfix_drec drec{};
-        drec.append_string(VALUE_SAMP_NAME2);
         drec.append_string(VALUE_SAMP_NAME1);
+        drec.append_string(VALUE_SAMP_NAME2);
+        drec.append_string(VALUE_SAMP_NAME3);
+        drec.append_string(VALUE_SAMP_NAME4);
         drec.append_string(VALUE_INF_DES);
         drec.append_string(VALUE_APP_DES);
         drec.append_uint(VALUE_SRC_PORT, 2);
@@ -565,7 +569,9 @@ protected:
 
     std::string VALUE_SRC_IP4    = "127.0.0.1";
     std::string VALUE_SAMP_NAME1  = "\xc2\xa1\xc3\xbd";
-    std::string VALUE_SAMP_NAME2  = "\xFF\xEE"; // invalid characters
+    std::string VALUE_SAMP_NAME2  = "\xFF\xEE"; // invalid characterss
+    std::string VALUE_SAMP_NAME3  = "\xef\xbf\xa6"; // FULLWIDTH WON SIGN (3 bytes)
+    std::string VALUE_SAMP_NAME4  = "\xf0\x90\x8e\xa0"; // OLD PERSIAN SIGN A (4 bytes)
     std::string VALUE_DST_IP4    = "8.8.8.8";
     std::string VALUE_APP_DES    = "web\\\nclose\t\"open\bdog\fcat\r\"\x23";
     std::string VALUE_INF_DES    = "\x97\x98";
@@ -682,13 +688,15 @@ TEST_F(Drec_extra, otherChar)
     EXPECT_EQ(size_t(rc), strlen(buff));
     EXPECT_NE(buff_size, BSIZE);
     Config cfg = parse_string(buff, JSON, "drec2json");
-    std::cout << cfg << '\n';
+
     EXPECT_EQ(cfg["iana:interfaceDescription"], "\u0097\u0098");
     ASSERT_TRUE(cfg["iana:samplerName"].is_array());
 
     auto arr = cfg["iana:samplerName"].as_array();
     EXPECT_EQ(std::find(arr.begin(), arr.end(), "\u00C2\u00A1\u00C3\u00BD" ),arr.end());
     EXPECT_EQ(std::find(arr.begin(), arr.end(), "\u00EF\u00BF\u00BD\u00EF\u00BF\u00BD" ),arr.end());
+    EXPECT_EQ(std::find(arr.begin(), arr.end(), "\u00f0\u0090\u008e\u00a0" ),arr.end());
+    EXPECT_EQ(std::find(arr.begin(), arr.end(), "\u00ef\u00bf\u00a6" ),arr.end());
 
     free(buff);
 }
