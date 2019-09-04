@@ -1,10 +1,7 @@
 #include "hash_table.h"
-#include "libfds.h"
 
-<<<<<<< HEAD
 struct hash_table *
-hash_table_init(struct hash_table *table, size_t table_size)
-{
+hash_table_init(struct hash_table *table, size_t table_size){
     table.list = (struct list *)calloc(table_size, sizeof(struct list));
     if (table.list == NULL){
         return NULL;
@@ -32,19 +29,23 @@ get_element(struct node *list, int index){
 	}
 	return tmp;
 }
-=======
-struct list *
-hash_table_init(struct list *table) {
 
-    table = (struct list *)calloc(DEF_TABLE_SIZE, sizeof(struct list));
-    if (table == NULL){
-        return NULL;
-    }
+int 
+find_key(struct node *list, char *key){
 
-    return table;
+	int index = 0;
+	struct node *tmp = list;
+
+	while (tmp != NULL){
+		if(tmp->key = key){
+			return index;
+		}
+		tmp = tmp->next;
+		index++;
+	}
+
+	return -1;
 }
-
->>>>>>> 4f2cf3d2c00636c24ee0a264ed07d7775bf91c78
 
 FDS_API
 insert_key(struct hash_table *table, char *key, void *value) {
@@ -53,7 +54,6 @@ insert_key(struct hash_table *table, char *key, void *value) {
         return FDS_ERR_ARG;
     }
 
-<<<<<<< HEAD
 	// Make index to hash table
     int index = hash(key);
 
@@ -65,20 +65,10 @@ insert_key(struct hash_table *table, char *key, void *value) {
 	if (item == NULL){
 		return FDS_ERR_NOMEM;
 	}
-=======
-    int index = hash(key);
-
-    /* Extracting Linked List at a given index */
-    struct node *list = (struct node*) table->list[index].head;
-
-    /* Creating an item to insert in the Hash Table */
-	struct node *item = (struct node*) malloc(sizeof(struct node));
->>>>>>> 4f2cf3d2c00636c24ee0a264ed07d7775bf91c78
 	item->key = key;
 	item->value = value;
 	item->next = NULL;
 
-<<<<<<< HEAD
 	// Iserting key on index
     if (list == NULL){
 		// Absence of Linked List at a given Index of hash table 
@@ -101,44 +91,23 @@ insert_key(struct hash_table *table, char *key, void *value) {
 	}
 
 	return FDS_OK;
-=======
-    if (list == NULL){
-		/* Absence of Linked List at a given Index of Hash Table */
- 		table->list[index].head = item;
-		table->list[index].tail = item;
-	}
-    else {
-        /* A Linked List is present at given index of Hash Table */
-
-		int find_index = find(list, key);
-		if (find_index == -1)
-                {
-			/*
-			 *Key not found in existing linked list
-			 *Adding the key at the end of the linked list
-			*/
-
-			array[index].tail->next = item;
-			array[index].tail = item;
-			size++;
-    }
-
-
 }
 
-FDS_API 
-find(struct node *list, char* key){
-	int retval = 0;
-	struct node *temp = list;
-	while (temp != NULL) {
-		if (temp->key == key){
-			return retval;
+void
+hash_table_clean(struct hash_table *table){
+
+	for (int i = 0; i < table->size; i++){
+
+        struct list *tmp_list = table->list[i];
+		struct node *tmp_node = tmp_list[tmp_index].head;
+
+		while(tmp_node != NULL){
+			struct node *tmp_next = tmp_node.next;
+			free(tmp_node);
+			tmp_node = tmp_next;
 		}
 
-  		temp = temp->next;
-		retval++;
-	}
-	return -1;
+        free(table->list[i]);
+    }
 
->>>>>>> 4f2cf3d2c00636c24ee0a264ed07d7775bf91c78
 }
