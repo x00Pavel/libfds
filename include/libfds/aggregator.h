@@ -50,6 +50,7 @@
  #include <arpa/inet.h> // inet_ntop
 
  #include "libfds.h"
+ #include "src/aggregator/hash_table.h"
 
 /** Enum of datatypes */
 enum fds_aggr_types {
@@ -70,7 +71,7 @@ enum fds_aggr_types {
      FDS_AGGR_IPV4_ADDRESS = 14,
      FDS_AGGR_IPV6_ADDRESS = 15,
      FDS_AGGR_UNASSIGNED = 255
- };
+};
 
 
 /** Union represents ID of element. ID can be integer or pointer (and other) 
@@ -81,12 +82,6 @@ union field_id{
     uint32_t int_id; /*< Integer value of ID */
     void *ptr_id;    /*< Pointer to ID       */
 };
-
-/** Cursor for data records */
-struct fds_aggr_cursor{
-    union field_id id; /*< ID of field         */
-    uint8_t *value;    /*< Value of this field */
-}/;
 
 /** Union for writing down value of field */
 union fds_aggr_field_value{
@@ -123,7 +118,7 @@ enum fds_aggr_function{
   *
   * \return ID of field
   */
-typedef int (*fds_aggr_get_element)(void *, int, union fds_aggr_field_value *);
+typedef FDS_API (*fds_aggr_get_element)(void *, union field_id, union fds_aggr_field_value *);
 
 /** Structure for description input fields */
 struct input_field{
@@ -137,15 +132,18 @@ struct input_field{
 /** Informational structure with basic info about field */
 struct field_info{
     union field_id id;          /*< ID of field       */
+    size_t size;                /*< Size of field     */
     enum fds_aggr_function fnc; /*< Function of field */
 };
 
 /** Structure for storing processed data about fields */
 struct fds_aggr_memory{
-    union field_id *key_id_list;   /*< Array of all key fields   */
+    struct field_info *key_list;   /*< Array of all key fields   */
+    size_t key_count;              /*< Count of keu fields       */
     size_t key_size;               /*< Size of key               */
-    char *key;
+    char *key;                     /*< Pointer to allcated key   */
     struct field_info *val_list;   /*< Array of all value fields */
+    size_t val_count;              /*< Count of value fields     */
     size_t val_size;               /*< Size of all values fields */
     // uint32_t sort_flags;           /*< Sorting flags             */
     fds_aggr_get_element *get_fnc; /*< Pointer to GET function (specified by user) */
@@ -199,44 +197,42 @@ fds_aggr_setup( const struct input_field *input_fields,
 void
 fds_agr_cleanup();
 
-/** \brief Build output record based on template from setup function
+/** \brief Add item to hash table
   *
   * Function do following steps:
   * 1. Find the field by ID
   * 2. Get values from this fields
-  * 3. Do corresponding operation
-  * 4. Write in output record
+  * 3. Do corresponding operation or aggregate as key field
+  * 4. Write down to hash table
   *
   * \param[in] record Pointer to data records
   * \param[in] memory Pointer to structure with info about fields
+  * 
+  * \return #FDS_OK on success
+  * \return #FDS_ERR_NOTFOUND if some fields not found during get_element function 
   */
-void
-fds_aggr_add_rec(void *record, const struct fds_aggr_memory *memory);
+FDS_API
+fds_aggr_add_item(void *record, const struct fds_aggr_memory *memory);
 
-/** \bried Function for initialization cursor for all record. Set cursor on first record
+/** \bried Function for initialization cursor for hasht table. 
   *
-  * \param[in] cursor Pointer for aggrigation structure
-  * \param[in] rec    Pointer for all datarecords
-  * \param[in] flags  Flags for iteration throught records
+  * \param[in] cursor Pointer to cursor
+  * \param[in] rec    Pointer to hash table
   *
   * \return FDS_OK on success
   */
-FDS_API int
-fds_aggr_cursor_init(struct fds_aggr_cursor *cursor, void *rec, uint32_t flags);
+FDS_API 
+fds_aggr_cursor_init(struct list *cursor, const struct hash_table *table);
 
 /** \brief Function for iteration through all datarecords
   *
   * \return FDS_OK on success
   */
-FDS_API int
+FDS_API 
 fds_aggr_cursor_next();
-
 
 /*
         TODO
-    1) зачем курсор, если есть функция get_element?
-    2) какой датовый тип писать в union fds_aggr_field_value для MAC адресов, временных печатей, IP адрессов
-       и т.д
     3) если имеем union с int и void*, то размер этого union будет равен размеру int или не обязатьльно?
     4) как узнать какой ID использовать (int или void*)? может специфицировать что void* по умолчанию будет NULL?
     5) как после заполнения ID в лист, потом проходить по этому листу?
