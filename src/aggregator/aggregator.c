@@ -1,4 +1,7 @@
+#include <assert.h>
+
 #include "aggregator.h"
+#include "hash_table.h"
 
 /** Aray of sizes of used datatypes.
   * DO NOT REODER,
@@ -26,41 +29,54 @@ size_t size_of[] = {
 
 
 FDS_API
-fds_aggr_init(struct fds_aggr_memory *memory){
+fds_aggr_init(struct fds_aggr_memory *memory, size_t table_size){
 
     if (memory == NULL){
         return FDS_ERR_ARG;
     }
 
-    memory->key_id_list = NULL;
+    memory->key_list = NULL;
     memory->key_size = 0;
-    memory->val_id_list = NULL;
+    memory->val_list = NULL;
     memory->val_size = 0;
-    memory->sort_flags = 0;
-
+    // memory->sort_flags = 0;
+    memory->get_fnc  = NULL;
+    // Initializaton of hash table
+    int rc = hash_table_init(memory->table, table_size);
+    if (rc != FDS_OK){
+        return rc;
+    }
     return FDS_OK;
 }
 
-
 int
-fds_aggr_setup(const struct input_field *input_fields, struct fds_aggr_memory *memory, size_t size,
-                int (*fds_aggr_get_element)(void*, int, struct fds_aggr_field*)){
-
+fds_aggr_setup( const struct input_field *input_fields, 
+                size_t input_size,
+                struct fds_aggr_memory *memory, 
+                fds_aggr_get_element *fnc,
+                char *key){
+   
     int key_count = 0;
     int val_count = 0;
 
+    assert(input_fields != NULL);
+    assert(fnc != NULL);
+    assert(memory != NULL);
+    assert(input_size > 0);
 
-   for (int i = 0; i < size; i++){
+    memory->get_fnc = fnc;
+
+    for (int i = 0; i < input_size; i++){
         if (input[i].fnc == FDS_KEY_FIELD){
             // Count total key size
             memory->key_size += size_of[input[i].type];
             // Count new array size
             const size_t array_size = (key_count + 1) * sizeof(union field_id); 
-            memory->key_id_list = realloc(memory->key_id_list, array_size);
-            if(memory->key_id_list == NULL){
+            memory->key_list = realloc(memory->key_list, array_size);
+            if(memory->key_list == NULL){
                 return FDS_ERR_NOMEM;
             }
-            memory->key_id_list[key_count] = input[i].id;
+            memory->key_list[key_count] = input[i].id;
             key_count++;
         }
         else {
@@ -78,5 +94,11 @@ fds_aggr_setup(const struct input_field *input_fields, struct fds_aggr_memory *m
         }
     }
 
+    memory->key = (char *) malloc(memory->key_size);
+    if(memory->key == NULL){
+        return FDS_ERR_NOMEM;
+    }
 
+    return FDS_OK;
 }
+
