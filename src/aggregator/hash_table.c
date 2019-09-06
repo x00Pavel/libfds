@@ -1,20 +1,26 @@
-#include "hash_table.h"
+#include <libfds.h>
 
-struct hash_table *
+#include "hash_table.h"
+#include "xxhash.h"
+
+FDS_API
 hash_table_init(struct hash_table *table, size_t table_size){
+	
+	assert(table != NULL);
+
     table.list = (struct list *)calloc(table_size, sizeof(struct list));
     if (table.list == NULL){
-        return NULL;
+        return FDS_ERR_NOMEM;
     }
 
 	for (int i = 0; i < table_size; i++){
 		table.list[i].head = NULL;
 		table.list[i].tail = NULL;
 	}
+	table.size = table_size;
 
-	table.size = table_size; //
 
-    return table;
+	return FDS_OK; 
 }
 
 struct node * 
@@ -30,7 +36,7 @@ get_element(struct node *list, int index){
 	return tmp;
 }
 
-int 
+FDS_API
 find_key(struct node *list, char *key){
 
 	int index = 0;
@@ -44,18 +50,23 @@ find_key(struct node *list, char *key){
 		index++;
 	}
 
-	return -1;
+	return FDS_ERR_NOTFOUND;
+}
+
+unsigned long
+hash_fnc(char *key, size_t key_size){
+	return XXH64(key, key_size, 0)
 }
 
 FDS_API
-insert_key(struct hash_table *table, char *key, void *value) {
+insert_key(struct hash_table *table, char *key, size_t key_size, void *value) {
 
     if (table == NULL || key == NULL){
         return FDS_ERR_ARG;
     }
 
 	// Make index to hash table
-    int index = hash(key);
+    unsigned long index = hash_fnc(key, key_size);
 
     // Extracting Linked List at a given index 
     struct node *list = (struct node*) table->list[index].head;
@@ -63,6 +74,7 @@ insert_key(struct hash_table *table, char *key, void *value) {
     // Creating an item to insert in the hash table 
 	struct node *item = (struct node*) malloc(sizeof(struct node));
 	if (item == NULL){
+		hash_table_clean(table);
 		return FDS_ERR_NOMEM;
 	}
 	item->key = key;
@@ -77,7 +89,7 @@ insert_key(struct hash_table *table, char *key, void *value) {
 	} else {
         // A Linked List is present at given index of hash table 
 		int find_index = find_key(list, key);
-		if (find_index == -1){ 
+		if (find_index == FDS_ERR_NOTFOUND){ 
 			 // Key not found in existing linked list
 			 // Adding the key at the end of the linked list
 			table->list[index].tail->next = item;

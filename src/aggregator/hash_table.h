@@ -2,9 +2,9 @@
 
 /** Node for storing an item in a linked list */
 struct node{
-    char *key;
-    void *value;
-    struct node *next;
+    char *key;         /*< Key of node  */
+    void *value;       /*< Value of key */
+    struct node *next; /*< Next node    */
 };
 
 /** Structure for storing a linked list */
@@ -21,20 +21,23 @@ struct hash_table{
 
 /** \brief Function for generating hash
   *
-  * \param[in] key Base for hash function
+  * \param[in] key      Base for hash function
+  * \param[in] key_szie Size of key
+  *
+  * \warning Be default, seed for hash function is 0
   *
   * \return Index to hash table
   */
-int
-hash_fnc(union field_id key);
+unsigned long
+hash_fnc(char *key, size_t key_size);
 
 /** \brief Fucntion for filling in key and value
-  * 
+  *
   * \param[in] table Pointer to table
   * \param[in] key   Key to be iserted
   * \param[in] value Value for given key
   */
-FDS_API
+FDS_API 
 insert_key(struct hash_table *table, char *key, int value);
 
 /** \brief Fucntion for allocating for hash table
@@ -43,7 +46,7 @@ insert_key(struct hash_table *table, char *key, int value);
   * \param[in]  table_size Requared size of table
   * \param[out] table      Poiter to allocated memory for table
   */
-struct hash_table *
+FDS_API
 hash_table_init(struct hash_table *table, size_t table_size);
 
 /** \brief Function finds the given key in the Linked List
@@ -54,7 +57,7 @@ hash_table_init(struct hash_table *table, size_t table_size);
   * \return In success, index of given key, 
   *  return -1 if key is not present
   */
-int
+FDS_API
 find_key(struct node *list, char* key);
 
 /** \brief Function for getting node from linked list
