@@ -51,11 +51,7 @@
 
  #include "libfds.h"
 
-<<<<<<< HEAD
 /** Enum of datatypes */
-=======
-/* Enum of datatypes */
->>>>>>> 4f2cf3d2c00636c24ee0a264ed07d7775bf91c78
 enum fds_aggr_types {
      FDS_AGGR_OCTET_ARRAY = 0,
      FDS_AGGR_UNSIGNED_8 = 1,
@@ -77,24 +73,15 @@ enum fds_aggr_types {
  };
 
 
-<<<<<<< HEAD
 /** Union represents ID of element. ID can be integer or pointer (and other) 
   * ptr_id MUST be specified or can be NULL 
   * If ptr_id is not NULL, int_id will be ingnored.
   */
-=======
-/*
- * Union represents ID of element. ID can be integer or pointer (and other) 
- * ptr_id MUST be specified or can be NULL 
- * If ptr_id is not NULL, int_id will be ingnored.
- */
->>>>>>> 4f2cf3d2c00636c24ee0a264ed07d7775bf91c78
 union field_id{
-    uint32_t int_id;
-    void *ptr_id;
+    uint32_t int_id; /*< Integer value of ID */
+    void *ptr_id;    /*< Pointer to ID       */
 };
 
-<<<<<<< HEAD
 /** Cursor for data records */
 struct fds_aggr_cursor{
     union field_id id; /*< ID of field         */
@@ -102,15 +89,6 @@ struct fds_aggr_cursor{
 }/;
 
 /** Union for writing down value of field */
-=======
-/* Cursor for data records */
-struct fds_aggr_cursor{
-    union field_id id; /* ID of field */
-    uint8_t *value;    /* Value of this field */
-};
-
-/* Union for writing down value of field */
->>>>>>> 4f2cf3d2c00636c24ee0a264ed07d7775bf91c78
 union fds_aggr_field_value{
     uint8_t  uint8;
     uint16_t uint16;
@@ -124,7 +102,6 @@ union fds_aggr_field_value{
     bool     boolean;
     uint8_t  ip[16];
     uint8_t mac[6];
-<<<<<<< HEAD
     uint64_t timestamp; 
 };
 
@@ -153,55 +130,26 @@ struct input_field{
     union field_id id;          /*< ID of field                            */
     enum fds_aggr_types type;   /*< Datatype of value                      */
     enum fds_aggr_function fnc; /*< Function of field (KEY, SUM, MIN, etc) */
-=======
-    uint64_t timestamp; // NANNOsec od UNIX epoch
-};
-
-enum fds_aggr_function{
-    FDS_KEY_FIELD,
-    FDS_SUM,
-    FDS_MIN,
-    FDS_MAX
-};
-
-/*
-* \brief Pointer to function for processing data record
-*
-* Function is specified by user.
-*
-* \param Pointer to data record
-* \param ID of field to be found
-* \param Union for writing down values (then this values will be set keys or values)
-*
-* \return ID of field
-*/
-typedef int (*fds_aggr_get_element)(void *, int, union fds_aggr_field_value *);
-
-/* Structure for description input fields */
-struct input_field{
-    union field_id id;          /* ID of field                            */
-    enum fds_aggr_types type;   /* Datatype of value                      */
-    enum fds_aggr_function fnc; /* Function of field (KEY, SUM, MIN, etc) */
->>>>>>> 4f2cf3d2c00636c24ee0a264ed07d7775bf91c78
 
     // In future can be extendet
 };
 
-<<<<<<< HEAD
 /** Informational structure with basic info about field */
 struct field_info{
-    union field_id id;          /* ID of field       */
-    enum fds_aggr_function fnc; /* Function of field */
+    union field_id id;          /*< ID of field       */
+    enum fds_aggr_function fnc; /*< Function of field */
 };
 
 /** Structure for storing processed data about fields */
 struct fds_aggr_memory{
     union field_id *key_id_list;   /*< Array of all key fields   */
     size_t key_size;               /*< Size of key               */
+    char *key;
     struct field_info *val_list;   /*< Array of all value fields */
     size_t val_size;               /*< Size of all values fields */
-    uint32_t sort_flags;           /*< Sorting flags             */
+    // uint32_t sort_flags;           /*< Sorting flags             */
     fds_aggr_get_element *get_fnc; /*< Pointer to GET function (specified by user) */
+    struct hash_table *table;      /*< Poiter to hash table      */
 };
 
 /** \brief Function for initialization memory to use
@@ -210,32 +158,40 @@ struct fds_aggr_memory{
   * By default, all values are 0 or NULL
   *
   * Function do following steps:
-  * 1. check pointer on structure
-  * 2. allocate memory for this structure
-  * 3. set default values
+  * 1. Check pointer on structure
+  * 2. Allocate memory for this structure
+  * 3. Set default values
+  * 4. Initialize hash table
   *
-  * \param memory Pointer for structure to initialize
-  *
-  * \return FDS_OK On success
- */
+  * \param[in] memory Pointer for structure to initialize
+  * \param[in] table_size Required size of hash table
+  * 
+  * \return #FDS_OK On success
+  * \return #FDS_ERR_NOMEM onli if allocation in hash_table_init fault
+  */
 int
 fds_aggr_init(struct fds_aggr_memory *memory);
 
 /** \brief Function for processing input data
-  *
-  * Function do following steps:
-  * 1. Aggregate input array of structures with information about key fields
-  * 2. Allocate memory for key (later key will be add with GET function)
-  * 3. Create hashtabel
-  *
-  * \param[in] fields Array of structures with information about fields
-  * \param[in] memory Poiter to memory to be initialized
-  * \param[in] size   Count of structures in array
-  * \param[in] fnc Pointer for GET Function
-  */
-int
-fds_aggr_setup(const struct input_field input[], struct fds_aggr_memory *memory, size_t size
-               /*, int (*fds_aggr_get_element)(void*, int, struct fds_aggr_field*)*/);
+ *
+ * Function do following steps:
+ * 1. Aggregate input array of structures with information about key fields
+ * 2. Allocate memory for key (later key will be add with GET function)
+ *
+ * \param[in] input      Array of structures with information about fields
+ * \param[in] input_size Count of structures in array
+ * \param[in] memory     Poiter to memory to be initialized
+ * \param[in] fnc        Pointer for GET Function
+ * 
+ * \return #FDS_OK on success
+ * \return #FDS_ERR_NOMEM in case of allocation error
+ */
+FDS_API 
+fds_aggr_setup( const struct input_field *input_fields, 
+                size_t input_size,
+                struct fds_aggr_memory *memory, 
+                size_t table_size, 
+                fds_aggr_get_element *fnc));
 
 /** \brief Function for cleaning all resources
   *
@@ -251,11 +207,11 @@ fds_agr_cleanup();
   * 3. Do corresponding operation
   * 4. Write in output record
   *
-  * \param[in] rec_list Pointer to list of all data records
-  * \param[in] memory   Pointer to structure with info about fields
+  * \param[in] record Pointer to data records
+  * \param[in] memory Pointer to structure with info about fields
   */
 void
-fds_aggr_add_rec(void *rec_list, const struct fds_aggr_memory *memory);
+fds_aggr_add_rec(void *record, const struct fds_aggr_memory *memory);
 
 /** \bried Function for initialization cursor for all record. Set cursor on first record
   *
@@ -272,98 +228,6 @@ fds_aggr_cursor_init(struct fds_aggr_cursor *cursor, void *rec, uint32_t flags);
   *
   * \return FDS_OK on success
   */
-=======
-/* Informational structure with basic info about field */
-struct field_info{
-    union field_id id;          /* ID of field       */
-    enum fds_aggr_function fnc; /* Function of field */
-};
-
-/* Structure for storing processed data about fields */
-struct fds_aggr_memory{
-    union field_id *key_id_list;  /* Array of all key fields   */
-    size_t key_size;              /* Size of key               */
-    struct field_info *val_list;   /* Array of all value fields */
-    size_t val_size;               /* Size of all values fields */
-    uint32_t sort_flags;           /* Sorting flags             */
-    fds_aggr_get_element *get_fnc; /* Pointer to GET function (specified by user) */
-};
-
-/*
- * \brief Function for initialization memory to use
- *
- * Function takes as parameter structure \p fds_aggr_memory, that will be initialized.
- * By default, all values are 0 or NULL
- *
- * Function do following steps:
- * 1. check pointer on structure
- * 2. allocate memory for this structure
- * 3. set default values
- *
- * \param memory Pointer for structure to initialize
- *
- * \return FDS_OK On success
- */
-int
-fds_aggr_init(struct fds_aggr_memory *memory);
-
-/*
- * \brief Function for processing input data
- *
- * Function do following steps:
- * 1. Aggregate input array of structures with information about key fields
- * 2. Allocate memory for key (later key will be add with GET function)
- * 3. Create hashtabel
- *
- * \param[in] fields Array of structures with information about fields
- * \param[in] memory Poiter to memory to be initialized
- * \param[in] size   Count of structures in array
- * \param[in] fnc Pointer for GET Function
- */
-int
-fds_aggr_setup(const struct input_field input[], struct fds_aggr_memory *memory, size_t size
-               /*, int (*fds_aggr_get_element)(void*, int, struct fds_aggr_field*)*/);
-
-/*
- * \brief Function for cleaning all resources
- *
- */
-void
-fds_agr_cleanup();
-
-/*
- * \brief Build output record based on template from setup function
- *
- * Function do following steps:
- * 1. Find the field by ID
- * 2. Get values from this fields
- * 3. Do corresponding operation
- * 4. Write in output record
- *
- * \param[in] rec_list Pointer to list of all data records
- * \param[in] memory   Pointer to structure with info about fields
- */
-void
-fds_aggr_add_rec(void *rec_list, const struct fds_aggr_memory *memory);
-
-/*
- * \bried Function for initialization cursor for all record. Set cursor on first record
- *
- * \param[in] cursor Pointer for aggrigation structure
- * \param[in] rec    Pointer for all datarecords
- * \param[in] flags  Flags for iteration throught records
- *
- * \return FDS_OK on success
- */
-FDS_API int
-fds_aggr_cursor_init(struct fds_aggr_cursor *cursor, void *rec, uint32_t flags);
-
-/*
- * \brief Function for iteration through all datarecords
- *
- * \return FDS_OK on success
- */
->>>>>>> 4f2cf3d2c00636c24ee0a264ed07d7775bf91c78
 FDS_API int
 fds_aggr_cursor_next();
 
