@@ -1,7 +1,6 @@
 #include <assert.h>
 
 #include "aggregator.h"
-#include "hash_table.h"
 
 /** Aray of sizes of used datatypes.
   * DO NOT REODER,
@@ -37,8 +36,11 @@ fds_aggr_init(struct fds_aggr_memory *memory, size_t table_size){
 
     memory->key_list = NULL;
     memory->key_size = 0;
+    memory->key_count = 0;
+    
     memory->val_list = NULL;
     memory->val_size = 0;
+    memory->val_count = 0;
     // memory->sort_flags = 0;
     memory->get_fnc  = NULL;
     // Initializaton of hash table
@@ -49,7 +51,7 @@ fds_aggr_init(struct fds_aggr_memory *memory, size_t table_size){
     return FDS_OK;
 }
 
-int
+FDS_API
 fds_aggr_setup( const struct input_field *input_fields, 
                 size_t input_size,
                 struct fds_aggr_memory *memory, 
@@ -70,29 +72,42 @@ fds_aggr_setup( const struct input_field *input_fields,
         if (input[i].fnc == FDS_KEY_FIELD){
             // Count total key size
             memory->key_size += size_of[input[i].type];
+           
             // Count new array size
             const size_t array_size = (key_count + 1) * sizeof(union field_id); 
+           
             memory->key_list = realloc(memory->key_list, array_size);
             if(memory->key_list == NULL){
                 return FDS_ERR_NOMEM;
             }
-            memory->key_list[key_count] = input[i].id;
+
+            memory->key_list[key_count].id = input[i].id;
+            memory->key_list[key_count].size = size_of[input[i].type];
+            memory->key_list[key_count].fnc = input[i].fnc;
+
             key_count++;
         }
-        else {
+        else {           
             // Count total values size
             memory->val_size += size_of[input[i].type];
+           
             // Count new array size
             const size_t array_size = (val_count + 1) * sizeof(struct field_info);
+            
             memory->val_list = realloc(memory->val_list, array_size);
             if(memory->key_list == NULL){
                 return FDS_ERR_NOMEM;
             }
+            
             memory->val_list[val_count].id = input[i].id;
+            memory->val_list[val_count].size = size_of[input[i].type];
             memory->val_list[val_count].fnc = input[i].fnc;
             val_count++;
         }
     }
+
+    memory->key_count = key_count;
+    memory->val_count = val_count;
 
     memory->key = (char *) malloc(memory->key_size);
     if(memory->key == NULL){
@@ -102,3 +117,34 @@ fds_aggr_setup( const struct input_field *input_fields,
     return FDS_OK;
 }
 
+FDS_API
+fds_aggr_add_item(void *record, const struct fds_aggr_memory *memory){
+    union fds_aggr_field_value *value;
+    fds_aggr_get_element *get_element = memory->get_fnc;
+    
+    int ret_code;
+    int offset = 0;
+    
+    // Make key
+    for (int i = 0; i < memory->key_count; i++){
+        ret_code = get_element(record, memory->key_list[i].id, value);
+        
+        if (ret_code != FDS_OK){
+            return ret_code;
+        }
+
+        memory->key[offset] = (char *)value;
+        offset += memory->key_list[i].size;
+    }
+
+    // Here must be step of getting value fields 
+
+    // Insert key to hash table
+    ret_code = insert_key(memory->table, memory->key, memory->key_size, value);
+
+    if(ret_code != FDS_OK){
+        return ret_code;
+    }
+
+    return FDS_OK;
+}
