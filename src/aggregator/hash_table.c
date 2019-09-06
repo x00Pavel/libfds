@@ -1,4 +1,5 @@
 #include <libfds.h>
+#include <assert.h>
 
 #include "hash_table.h"
 #include "xxhash.h"
@@ -7,6 +8,7 @@ FDS_API
 hash_table_init(struct hash_table *table, size_t table_size){
 	
 	assert(table != NULL);
+	assert(table_size > 0);
 
     table.list = (struct list *)calloc(table_size, sizeof(struct list));
     if (table.list == NULL){
@@ -26,6 +28,8 @@ hash_table_init(struct hash_table *table, size_t table_size){
 struct node * 
 get_element(struct node *list, int index){
 	
+	assert(list != NULL);
+
 	int i = 0;
 	struct node *tmp = list;
 
@@ -38,6 +42,9 @@ get_element(struct node *list, int index){
 
 FDS_API
 find_key(struct node *list, char *key){
+
+	assert(list != NULL);
+	assert(key != NULL);
 
 	int index = 0;
 	struct node *tmp = list;
@@ -107,6 +114,8 @@ insert_key(struct hash_table *table, char *key, size_t key_size, void *value) {
 
 void
 hash_table_clean(struct hash_table *table){
+
+	assert(table != NULL);
 
 	for (int i = 0; i < table->size; i++){
 
