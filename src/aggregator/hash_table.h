@@ -33,12 +33,15 @@ hash_fnc(char *key, size_t key_size);
 
 /** \brief Fucntion for filling in key and value
   *
-  * \param[in] table Pointer to table
-  * \param[in] key   Key to be iserted
-  * \param[in] value Value for given key
+  * \param[in] table    Pointer to table
+  * \param[in] key      Key to be iserted
+  * \param[in] key_size Size of key
+  * \param[in] value    Value for given key
+  * 
+  * \return #FDS_OK on success
   */
-FDS_API 
-insert_key(struct hash_table *table, char *key, int value);
+FDS_API
+insert_key(struct hash_table *table, char *key, size_t key_size, void *value);
 
 /** \brief Fucntion for allocating for hash table
   *
