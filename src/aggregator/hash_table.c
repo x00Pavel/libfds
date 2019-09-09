@@ -48,8 +48,33 @@
 #include "hash_table.h"
 #include "xxhash.h"
 
+typedef int (*aggr_function)(struct context *, const struct field *);
+
+/** \brief Find a function for value field
+  * \param[in] field Field to process
+  * 
+  * \return Conversion function
+  */
+aggr_function 
+get_function(const struct field *field)
+{
+    // Conversion table, based on types defined by enum fds_iemgr_element_type
+    static const aggr_function table[] = {
+        &aggr_sum,
+		&aggr_max,
+		&aggr_min,
+		&aggr_or
+    };
+
+    const size_t table_size = sizeof(table) / sizeof(table[0]);
+    const enum fds_aggr_function function = field->fnc;
+
+    return table[function];
+}
+
 FDS_API
-hash_table_init(struct hash_table *table, size_t table_size){
+hash_table_init(struct hash_table *table, size_t table_size)
+{
 	
 	assert(table != NULL);
 	assert(table_size > 0);
@@ -70,7 +95,8 @@ hash_table_init(struct hash_table *table, size_t table_size){
 }
 
 struct node * 
-get_element(struct node *list, int index){
+get_element(struct node *list, int index)
+{
 	
 	assert(list != NULL);
 
@@ -105,31 +131,34 @@ find_key(struct node *list, char *key){
 }
 
 unsigned long
-hash_fnc(char *key, size_t key_size){
-	return XXH64(key, key_size, 0)
-}
+hash_fnc(char *key, size_t key_size){return XXH64(key, key_size, 0)}
+
 
 FDS_API
-insert_key(struct hash_table *table, char *key, size_t key_size, void *value) {
-
-    if (table == NULL || key == NULL){
-        return FDS_ERR_ARG;
-    }
-
+insert_key(const struct fds_aggr_memory *memory)
+{
+	int ret_code = 0;
 	// Make index to hash table
-    unsigned long index = hash_fnc(key, key_size);
+    const unsigned long index = hash_fnc(memory->key, memory->key_size);
 
     // Extracting Linked List at a given index 
-    struct node *list = (struct node*) table->list[index].head;
+    const struct node *list = (struct node*) memory->table->list[index].head;
 
     // Creating an item to insert in the hash table 
-	struct node *item = (struct node*) malloc(sizeof(struct node));
+	const struct node *item = (struct node*) malloc(sizeof(struct node));
 	if (item == NULL){
-		hash_table_clean(table);
+		// hash_table_clean(table);
 		return FDS_ERR_NOMEM;
 	}
-	item->key = key;
-	item->value = value;
+
+	// Insert key
+	item->key = memore->key;
+	
+	// Isert all value fields
+	for (int i = 0; i < memory->val_count; i++){
+		item->value[i] = memory->val_list[i].value;
+	}
+	
 	item->next = NULL;
 
 	// Iserting key on index
@@ -149,7 +178,16 @@ insert_key(struct hash_table *table, char *key, size_t key_size, void *value) {
 			// Key already present in linked list
 			// Updating the value of already existing key
 			struct node *element = get_element(list, find_index);
-			element->value = value;
+
+			aggr_function fn;
+			// Do propriet function with field
+			for (int i = 0; i < memory->val_count; i++){
+				fn = get_function(memory->val_list[i]);
+				ret_code = fn(memory->val_lsit[i].value, element->value);
+				if(ret_code != FDS_Ok){
+					return ret_code;
+				}
+			}
 		}
 	}
 
@@ -157,7 +195,8 @@ insert_key(struct hash_table *table, char *key, size_t key_size, void *value) {
 }
 
 void
-hash_table_clean(struct hash_table *table){
+hash_table_clean(struct hash_table *table)
+{
 
 	assert(table != NULL);
 
