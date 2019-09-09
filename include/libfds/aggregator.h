@@ -2,7 +2,7 @@
  * \file include/libfds/aggregator.h
  * \author Lukas Hutak <lukas.hutak@cesnet.cz>
  * \author Pavel Yadlouski <xyadlo00@stud.fit.vutbr.cz>
- * \brief Aggregation modul for IPFIX collector
+ * \brief Aggregation modul for IPFIX collector (header file)
  * \date July 2019
  */
 /**
@@ -189,7 +189,7 @@ fds_aggr_setup( const struct input_field *input_fields,
                 size_t input_size,
                 struct fds_aggr_memory *memory, 
                 size_t table_size, 
-                fds_aggr_get_element *fnc));
+                fds_aggr_get_element *fnc);
 
 /** \brief Function for cleaning all resources
   *
