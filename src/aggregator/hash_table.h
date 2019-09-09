@@ -84,7 +84,7 @@ hash_fnc(char *key, size_t key_size);
   * \return #FDS_OK on success
   */
 FDS_API
-insert_key(struct hash_table *table, char *key, size_t key_size, union fds_aggr_field_value *value);
+insert_key(const struct fds_aggr_memory *memory);
 
 /** \brief Fucntion for allocating for hash table
   *
