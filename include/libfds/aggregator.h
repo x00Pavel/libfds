@@ -102,10 +102,11 @@ union fds_aggr_field_value{
 
 /** Avaliable functions of fields */
 enum fds_aggr_function{
-    FDS_KEY_FIELD,
     FDS_SUM,
     FDS_MIN,
-    FDS_MAX
+    FDS_MAX,
+    FDS_OR,
+    FDS_KEY_FIELD
 };
 
 /** \brief Pointer to function for processing data record
@@ -130,19 +131,20 @@ struct input_field{
 };
 
 /** Informational structure with basic info about field */
-struct field_info{
+struct field{
     union field_id id;          /*< ID of field       */
+    union fds_aggr_field_value *value; /*< Value of field    */
     size_t size;                /*< Size of field     */
     enum fds_aggr_function fnc; /*< Function of field */
 };
 
 /** Structure for storing processed data about fields */
 struct fds_aggr_memory{
-    struct field_info *key_list;   /*< Array of all key fields   */
+    struct field *key_list;        /*< Array of all key fields   */
     size_t key_count;              /*< Count of keu fields       */
     size_t key_size;               /*< Size of key               */
     char *key;                     /*< Pointer to allcated key   */
-    struct field_info *val_list;   /*< Array of all value fields */
+    struct field *val_list;        /*< Array of all value fields */
     size_t val_count;              /*< Count of value fields     */
     size_t val_size;               /*< Size of all values fields */
     // uint32_t sort_flags;           /*< Sorting flags             */
