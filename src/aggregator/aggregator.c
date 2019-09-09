@@ -135,7 +135,7 @@ fds_aggr_setup( const struct input_field *input_fields,
             memory->val_size += size_of[input[i].type];
            
             // Count new array size
-            const size_t array_size = (val_count + 1) * sizeof(struct field_info);
+            const size_t array_size = (val_count + 1) * sizeof(struct field);
             
             memory->val_list = realloc(memory->val_list, array_size);
             if(memory->key_list == NULL){
@@ -168,6 +168,8 @@ fds_aggr_add_item(void *record, const struct fds_aggr_memory *memory){
     int ret_code;
     int offset = 0;
     
+    // Can i do this in another way?
+
     // Make key
     for (int i = 0; i < memory->key_count; i++){
         ret_code = get_element(record, memory->key_list[i].id, value);
@@ -180,10 +182,20 @@ fds_aggr_add_item(void *record, const struct fds_aggr_memory *memory){
         offset += memory->key_list[i].size;
     }
 
-    // Here must be step of getting value fields 
+    // Getting value fields 
+    for (int i = 0; i < memory->val_count; i++){
+        ret_code = get_element(record, memory->val_list[i].id, value);
+
+        if (ret_code != FDS_OK){
+            return ret_code;
+        }
+
+        memory->val_list[offset].value = value;
+        offset += memory->key_list[i].size;
+    }
 
     // Insert key to hash table
-    ret_code = insert_key(memory->table, memory->key, memory->key_size, value);
+    ret_code = insert_key(memory);
 
     if(ret_code != FDS_OK){
         return ret_code;
