@@ -40,17 +40,21 @@
  *
  */
 
- #include <stddef.h>    // size_t
- #include <stdint.h>    // uintXX_t, intXX_t
- #include <stdbool.h>   // bool
- #include <time.h>      // struct timespec
- #include <string.h>    // memcpy
- #include <float.h>     // float min/max
- #include <assert.h>    // static_assert
- #include <arpa/inet.h> // inet_ntop
+#include <stddef.h>    // size_t
+#include <stdint.h>    // uintXX_t, intXX_t
+#include <stdbool.h>   // bool
+#include <string.h>    // memcpy
+#include <float.h>     // float min/max
 
- #include "libfds.h"
- #include "src/aggregator/hash_table.h"
+#include "libfds.h"
+#include "src/aggregator/hash_table.h"
+
+#ifndef LIBFDS_AGGREGATOR_H
+#define LIBFDS_AGGREGATOR_H
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /** Enum of datatypes */
 enum fds_aggr_types {
@@ -67,9 +71,9 @@ enum fds_aggr_types {
      FDS_AGGR_BOOLEAN = 10,
      FDS_AGGR_MAC_ADDRESS = 11,
      FDS_AGGR_STRING = 12,
-     FDS_AGGR_DATE_TIME_NANOSECONDS = 13,
-     FDS_AGGR_IPV4_ADDRESS = 14,
-     FDS_AGGR_IPV6_ADDRESS = 15,
+     FDS_AGGR_IPV4_ADDRESS = 13,
+     FDS_AGGR_IPV6_ADDRESS = 14,
+     FDS_AGGR_DATE_TIME_NANOSECONDS = 15,
      FDS_AGGR_UNASSIGNED = 255
 };
 
@@ -96,7 +100,7 @@ union fds_aggr_field_value{
     double   dbl;
     bool     boolean;
     uint8_t  ip[16];
-    uint8_t mac[6];
+    uint8_t  mac[6];
     uint64_t timestamp; 
 };
 
@@ -132,10 +136,11 @@ struct input_field{
 
 /** Informational structure with basic info about field */
 struct field{
-    union field_id id;          /*< ID of field       */
+    union field_id id;                 /*< ID of field       */
     union fds_aggr_field_value *value; /*< Value of field    */
-    size_t size;                /*< Size of field     */
-    enum fds_aggr_function fnc; /*< Function of field */
+    enum fds_aggr_types type;          /*< Datatype of value */
+    size_t size;                       /*< Size of field     */
+    enum fds_aggr_function fnc;        /*< Function of field */
 };
 
 /** Structure for storing processed data about fields */
@@ -147,7 +152,7 @@ struct fds_aggr_memory{
     struct field *val_list;        /*< Array of all value fields */
     size_t val_count;              /*< Count of value fields     */
     size_t val_size;               /*< Size of all values fields */
-    // uint32_t sort_flags;           /*< Sorting flags             */
+    uint32_t sort_flags;           /*< Sorting flags             */
     fds_aggr_get_element *get_fnc; /*< Pointer to GET function (specified by user) */
     struct hash_table *table;      /*< Poiter to hash table      */
 };
@@ -232,6 +237,8 @@ fds_aggr_cursor_init(struct list *cursor, const struct hash_table *table);
   */
 FDS_API 
 fds_aggr_cursor_next();
+
+#endif /* LIBFDS_AGGREGATOR_H */
 
 /*
         TODO
