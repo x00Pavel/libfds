@@ -53,6 +53,7 @@
  * \brief APIs for manipulation with IPFIX Messages.
  */
 #include <libfds/api.h>
+#include <lifds/aggreagtor.h>
 #include <libfds/converters.h>
 #include <libfds/iemgr.h>
 #include <libfds/drec.h>
