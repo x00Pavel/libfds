@@ -50,7 +50,7 @@
   * INDEXIS ARE ASSOCITED WITH enum fds_aggr_types !!
   */
 size_t size_of[] = {
-     4, // ??????  size of  octet array
+     4, // ??????  size of octet array
      sizeof(uint8_t),
      sizeof(uint16_t),
      sizeof(uint32_t),
@@ -101,13 +101,14 @@ fds_aggr_setup( const struct input_field *input_fields,
                 fds_aggr_get_element *fnc,
                 char *key){
    
-    int key_count = 0;
-    int val_count = 0;
 
     assert(input_fields != NULL);
     assert(fnc != NULL);
     assert(memory != NULL);
     assert(input_size > 0);
+
+    int key_count = 0;
+    int val_count = 0;
 
     memory->get_fnc = fnc;
 
@@ -125,6 +126,7 @@ fds_aggr_setup( const struct input_field *input_fields,
             }
 
             memory->key_list[key_count].id = input[i].id;
+            memory->val_list[val_count].type = input[i].type;
             memory->key_list[key_count].size = size_of[input[i].type];
             memory->key_list[key_count].fnc = input[i].fnc;
 
@@ -143,6 +145,7 @@ fds_aggr_setup( const struct input_field *input_fields,
             }
             
             memory->val_list[val_count].id = input[i].id;
+            memory->val_list[val_count].type = input[i].type;
             memory->val_list[val_count].size = size_of[input[i].type];
             memory->val_list[val_count].fnc = input[i].fnc;
             val_count++;
