@@ -45,9 +45,9 @@
 
 /** Node for storing an item in a linked list */
 struct node{
-    char *key;                         /*< Key of node  */
-    union fds_aggr_field_value *value; /*< Value of key */
-    struct node *next;                 /*< Next node    */
+    char *key;           /*< Key of node */
+    struct field *val_fields; /*< Value fields */
+    struct node *next;   /*< Next node   */
 };
 
 /** Structure for storing a linked list */
