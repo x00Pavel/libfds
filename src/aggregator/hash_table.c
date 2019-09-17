@@ -43,30 +43,207 @@
 
 
 #include <libfds.h>
-#include <assert.h>
+#include <assert.h> // static_assert
 
 #include "hash_table.h"
 #include "xxhash.h"
 
-typedef int (*aggr_function)(struct context *, const struct field *);
+typedef int (*aggr_function)(const struct field *);
 
-/** \brief Find a function for value field
-  * \param[in] field Field to process
-  * 
-  * \return Conversion function
-  */
+/** 
+ * \brief Function for making sum of values
+ * 
+ * \param[in] src Pointer to sources value field
+ * \param[out] dst Poiter to destenation value field
+ * 
+ * \return #FDS_OK on success 
+*/
+int
+aggr_sum(const struct field *src, struct field *dst)
+{
+	assert(src != NULL);
+	assert(dst != NULL);
+
+    switch (src->type) {
+    case FDS_AGGR_UNSIGNED_8:
+        dst->value->uint8 += src->value->uint8;
+        break;
+    case FDS_AGGR_UNSIGNED_16:
+        dst->value->uint16 += src->value->uint16;
+        break;
+    case FDS_AGGR_UNSIGNED_32:
+        dst->value->uint32 += src->value->uint32;
+        break;
+    case FDS_AGGR_UNSIGNED_64:
+        dst->value->uint64 += src->value->uint64;
+        break;
+    case FDS_AGGR_SIGNED_8:
+        dst->value->int8 += src->value->int8;
+        break;
+    case FDS_AGGR_SIGNED_16:
+        dst->value->int16 += src->value->int16;
+        break;
+    case FDS_AGGR_SIGNED_32:
+        dst->value->int32 += src->value->int32;
+        break;
+    case FDS_AGGR_SIGNED_64:
+        dst->value->int64 += src->value->int64;
+        break;
+    case FDS_AGGR_DOUBLE:
+        dst->value->dbl += src->value->dbl;
+        break;
+    default:
+        // Hete must be error handling
+        return FDS_ERR_NOTFOUND;
+    }
+
+    return FDS_OK;
+}
+
+/**
+ * \brief Function for choosing maximum from two values 
+ *
+ * \param[in] src Pointer to sources value field
+ * \param[out] dst Poiter to destenation value field
+ *
+ * \return #FDS_OK on success
+ */
+int
+aggr_max(const struct field *src, struct field *dst)
+{
+    assert(src != NULL);
+    assert(dst != NULL);
+
+    switch (src->type) {
+    case FDS_AGGR_UNSIGNED_8:
+        if (src->value->uint8 > dst->value->uint8)
+			dst->value->uint8 = src->value->uint8;
+        break;
+    case FDS_AGGR_UNSIGNED_16:
+        if (src->value->uint8 > dst->value->uint8)
+            dst->value->uint16 = src->value->uint16;
+        break;
+    case FDS_AGGR_UNSIGNED_32:
+        if (src->value->uint32 > dst->value->uint32)
+            dst->value->uint32 = src->value->uint32;
+        break;
+    case FDS_AGGR_UNSIGNED_64:
+        if (src->value->uint64 > dst->value->uint64)
+            dst->value->uint64 = src->value->uint64;
+        break;
+    case FDS_AGGR_SIGNED_8:
+        if (src->value->int8 > dst->value->int8)
+			dst->value->int8 = src->value->int8;
+        break;
+    case FDS_AGGR_SIGNED_16:
+        if (src->value->int16 > dst->value->int16)
+			dst->value->int16 = src->value->int16;
+        break;
+    case FDS_AGGR_SIGNED_32:
+        if (src->value->int32 > dst->value->int32)
+            dst->value->int32 = src->value->int32;
+        break;
+    case FDS_AGGR_SIGNED_64:
+        if (src->value->int64 > dst->value->int64)
+            dst->value->int64 = src->value->int64;
+        break;
+    case FDS_AGGR_DOUBLE:
+        if (src->value->dbl > dst->value->dbl)
+            dst->value->dbl = src->value->dbl;
+        break;
+    case FDS_AGGR_DATE_TIME_NANOSECONDS:
+        if (src->value->timestamp > dst->value->timestamp)
+            dst->value->timestamp = src->value->timestamp;
+        break;
+    default:
+        // Hete must be error handling
+        return FDS_ERR_NOTFOUND;
+    }
+
+    return FDS_OK;
+}
+
+/**
+ * \brief Function for choosing minimum from two values
+ *
+ * \param[in] src Pointer to sources value field
+ * \param[out] dst Poiter to destenation value field
+ *
+ * \return #FDS_OK on success
+ */
+int
+aggr_min(const struct field *src, struct field *dst)
+{
+    assert(src != NULL);
+    assert(dst != NULL);
+
+    switch (src->type) {
+    case FDS_AGGR_UNSIGNED_8:
+        if (src->value->uint8 < dst->value->uint8)
+			dst->value->uint8 = src->value->uint8;
+        break;
+    case FDS_AGGR_UNSIGNED_16:
+        if (src->value->uint8 < dst->value->uint8)
+            dst->value->uint16 = src->value->uint16;
+        break;
+    case FDS_AGGR_UNSIGNED_32:
+        if (src->value->uint32 < dst->value->uint32)
+            dst->value->uint32 = src->value->uint32;
+        break;
+    case FDS_AGGR_UNSIGNED_64:
+        if (src->value->uint64 < dst->value->uint64)
+            dst->value->uint64 = src->value->uint64;
+        break;
+    case FDS_AGGR_SIGNED_8:
+        if (src->value->int8 < dst->value->int8)
+			dst->value->int8 = src->value->int8;
+        break;
+    case FDS_AGGR_SIGNED_16:
+        if (src->value->int16 < dst->value->int16)
+			dst->value->int16 = src->value->int16;
+        break;
+    case FDS_AGGR_SIGNED_32:
+        if (src->value->int32 < dst->value->int32)
+            dst->value->int32 = src->value->int32;
+        break;
+    case FDS_AGGR_SIGNED_64:
+        if (src->value->int64 < dst->value->int64)
+            dst->value->int64 = src->value->int64;
+        break;
+    case FDS_AGGR_DOUBLE:
+        if (src->value->dbl < dst->value->dbl)
+            dst->value->dbl = src->value->dbl;
+        break;
+    case FDS_AGGR_DATE_TIME_NANOSECONDS:
+        if (src->value->timestamp < dst->value->timestamp)
+            dst->value->timestamp = src->value->timestamp;
+        break;
+    default:
+        // Hete must be error handling
+        return FDS_ERR_NOTFOUND;
+    }
+
+
+    return FDS_OK;
+}
+
+/** 
+ * \brief Find a function for value field
+ * 
+ * \param[in] field Field to process
+ * 
+ *  \return Conversion function
+ */
 aggr_function 
 get_function(const struct field *field)
 {
-    // Conversion table, based on types defined by enum fds_iemgr_element_type
+	// Aggregation functions 
     static const aggr_function table[] = {
         &aggr_sum,
-		&aggr_max,
 		&aggr_min,
-		&aggr_or
+		&aggr_max
     };
 
-    const size_t table_size = sizeof(table) / sizeof(table[0]);
     const enum fds_aggr_function function = field->fnc;
 
     return table[function];
@@ -95,7 +272,7 @@ hash_table_init(struct hash_table *table, size_t table_size)
 }
 
 struct node * 
-get_element(struct node *list, int index)
+get_element(const struct node *list, int index)
 {
 	
 	assert(list != NULL);
@@ -111,7 +288,8 @@ get_element(struct node *list, int index)
 }
 
 FDS_API
-find_key(struct node *list, char *key){
+find_key(const struct node *list, const char *key)
+{
 
 	assert(list != NULL);
 	assert(key != NULL);
@@ -155,9 +333,7 @@ insert_key(const struct fds_aggr_memory *memory)
 	item->key = memore->key;
 	
 	// Isert all value fields
-	for (int i = 0; i < memory->val_count; i++){
-		item->value[i] = memory->val_list[i].value;
-	}
+	item->val_fields = memory->val_list;
 	
 	item->next = NULL;
 
@@ -168,13 +344,13 @@ insert_key(const struct fds_aggr_memory *memory)
 		table->list[index].tail = item;
 	} else {
         // A Linked List is present at given index of hash table 
-		int find_index = find_key(list, key);
+		int find_index = find_key(list, memory->key);
 		if (find_index == FDS_ERR_NOTFOUND){ 
 			 // Key not found in existing linked list
 			 // Adding the key at the end of the linked list
 			table->list[index].tail->next = item;
 			table->list[index].tail = item;
-    	} else {
+		} else {
 			// Key already present in linked list
 			// Updating the value of already existing key
 			struct node *element = get_element(list, find_index);
@@ -183,7 +359,9 @@ insert_key(const struct fds_aggr_memory *memory)
 			// Do propriet function with field
 			for (int i = 0; i < memory->val_count; i++){
 				fn = get_function(memory->val_list[i]);
-				ret_code = fn(memory->val_lsit[i].value, element->value);
+			 
+			 	ret_code = fn(memory->val_lsit[i], element->val_fields[i]);
+			
 				if(ret_code != FDS_Ok){
 					return ret_code;
 				}
