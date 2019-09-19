@@ -39,22 +39,21 @@
  * if advised of the possibility of such damage.
  *
  */
+ #ifdef __cplusplus
+    extern "C"{
+#endif
+
+#ifndef LIBFDS_AGGREGATOR_H
+#define LIBFDS_AGGREGATOR_H
 
 #include <stddef.h>    // size_t
 #include <stdint.h>    // uintXX_t, intXX_t
 #include <stdbool.h>   // bool
 #include <string.h>    // memcpy
 #include <float.h>     // float min/max
+#include <libfds/api.h>
 
-#include "libfds.h"
-#include "src/aggregator/hash_table.h"
-
-#ifndef LIBFDS_AGGREGATOR_H
-#define LIBFDS_AGGREGATOR_H
-
-#ifdef __cplusplus
-extern "C" {
-#endif
+#include "../../src/aggregator/hash_table.h"
 
 /** Enum of datatypes */
 enum fds_aggr_types {
@@ -78,8 +77,8 @@ enum fds_aggr_types {
 };
 
 
-/** Union represents ID of element. ID can be integer or pointer (and other) 
-  * ptr_id MUST be specified or can be NULL 
+/** Union represents ID of element. ID can be integer or pointer (and other)
+  * ptr_id MUST be specified or can be NULL
   * If ptr_id is not NULL, int_id will be ingnored.
   */
 union field_id{
@@ -101,7 +100,7 @@ union fds_aggr_field_value{
     bool     boolean;
     uint8_t  ip[16];
     uint8_t  mac[6];
-    uint64_t timestamp; 
+    uint64_t timestamp;
 };
 
 /** Avaliable functions of fields */
@@ -109,7 +108,6 @@ enum fds_aggr_function{
     FDS_SUM,
     FDS_MIN,
     FDS_MAX,
-    FDS_OR,
     FDS_KEY_FIELD
 };
 
@@ -123,10 +121,10 @@ enum fds_aggr_function{
   *
   * \return ID of field
   */
-typedef FDS_API (*fds_aggr_get_element)(void *, union field_id, union fds_aggr_field_value *);
+typedef int (*fds_aggr_get_element)(void *, union field_id, union fds_aggr_field_value *);
 
 /** Structure for description input fields */
-struct input_field{
+struct input_field {
     union field_id id;          /*< ID of field                            */
     enum fds_aggr_types type;   /*< Datatype of value                      */
     enum fds_aggr_function fnc; /*< Function of field (KEY, SUM, MIN, etc) */
@@ -170,11 +168,11 @@ struct fds_aggr_memory{
   *
   * \param[in] memory Pointer for structure to initialize
   * \param[in] table_size Required size of hash table
-  * 
+  *
   * \return #FDS_OK On success
   * \return #FDS_ERR_NOMEM onli if allocation in hash_table_init fault
   */
-int
+FDS_API int
 fds_aggr_init(struct fds_aggr_memory *memory);
 
 /** \brief Function for processing input data
@@ -187,22 +185,22 @@ fds_aggr_init(struct fds_aggr_memory *memory);
  * \param[in] input_size Count of structures in array
  * \param[in] memory     Poiter to memory to be initialized
  * \param[in] fnc        Pointer for GET Function
- * 
+ *
  * \return #FDS_OK on success
  * \return #FDS_ERR_NOMEM in case of allocation error
  */
-FDS_API 
-fds_aggr_setup( const struct input_field *input_fields, 
+FDS_API int
+fds_aggr_setup( const struct input_field *input_fields,
                 size_t input_size,
-                struct fds_aggr_memory *memory, 
-                size_t table_size, 
-                fds_aggr_get_element *fnc);
+                struct fds_aggr_memory *memory,
+                size_t table_size,
+                const fds_aggr_get_element *fnc);
 
 /** \brief Function for cleaning all resources
   *
   */
 void
-fds_agr_cleanup();
+fds_aggr_cleanup(struct fds_aggr_memory *memory);
 
 /** \brief Add item to hash table
   *
@@ -214,36 +212,38 @@ fds_agr_cleanup();
   *
   * \param[in] record Pointer to data records
   * \param[in] memory Pointer to structure with info about fields
-  * 
+  *
   * \return #FDS_OK on success
-  * \return #FDS_ERR_NOTFOUND if some fields not found during get_element function 
+  * \return #FDS_ERR_NOTFOUND if some fields not found during get_element function
   */
-FDS_API
+FDS_API int
 fds_aggr_add_item(void *record, const struct fds_aggr_memory *memory);
 
-/** \bried Function for initialization cursor for hasht table. 
+/** \bried Function for initialization cursor for hasht table.
   *
   * \param[in] cursor Pointer to cursor
   * \param[in] rec    Pointer to hash table
   *
-  * \return FDS_OK on success
+  * Set #cursor on the first node in hash table
+  *
+  * \return FDS_OK on succes
   */
-FDS_API 
+FDS_API int
 fds_aggr_cursor_init(struct list *cursor, const struct hash_table *table);
 
-/** \brief Function for iteration through all datarecords
+/** \brief Function for iteration through hash table
   *
   * \return FDS_OK on success
   */
-FDS_API 
-fds_aggr_cursor_next();
+FDS_API int
+fds_aggr_cursor_next(const struct list *table);
+
+#ifdef __cplusplus
+    }
+#endif
 
 #endif /* LIBFDS_AGGREGATOR_H */
 
 /*
-        TODO
-    3) если имеем union с int и void*, то размер этого union будет равен размеру int или не обязатьльно?
-    4) как узнать какой ID использовать (int или void*)? может специфицировать что void* по умолчанию будет NULL?
-    5) как после заполнения ID в лист, потом проходить по этому листу?
-
+    TODO
 */
