@@ -42,8 +42,7 @@
  */
 
 #include <assert.h>
-
-#include "aggregator.h"
+#include <libfds.h>
 
 /** Aray of sizes of used datatypes.
   * DO NOT REODER,
@@ -70,7 +69,7 @@ size_t size_of[] = {
 };
 
 
-FDS_API
+FDS_API int
 fds_aggr_init(struct fds_aggr_memory *memory, size_t table_size){
 
     if (memory == NULL){
@@ -80,7 +79,7 @@ fds_aggr_init(struct fds_aggr_memory *memory, size_t table_size){
     memory->key_list = NULL;
     memory->key_size = 0;
     memory->key_count = 0;
-    
+
     memory->val_list = NULL;
     memory->val_size = 0;
     memory->val_count = 0;
@@ -94,13 +93,12 @@ fds_aggr_init(struct fds_aggr_memory *memory, size_t table_size){
     return FDS_OK;
 }
 
-FDS_API
-fds_aggr_setup( const struct input_field *input_fields, 
+FDS_API int
+fds_aggr_setup( const struct input_field *input_fields,
                 size_t input_size,
-                struct fds_aggr_memory *memory, 
+                struct fds_aggr_memory *memory,
                 fds_aggr_get_element *fnc,
                 char *key){
-   
 
     assert(input_fields != NULL);
     assert(fnc != NULL);
@@ -116,10 +114,10 @@ fds_aggr_setup( const struct input_field *input_fields,
         if (input[i].fnc == FDS_KEY_FIELD){
             // Count total key size
             memory->key_size += size_of[input[i].type];
-           
+
             // Count new array size
-            const size_t array_size = (key_count + 1) * sizeof(union field_id); 
-           
+            const size_t array_size = (key_count + 1) * sizeof(union field_id);
+
             memory->key_list = realloc(memory->key_list, array_size);
             if(memory->key_list == NULL){
                 return FDS_ERR_NOMEM;
@@ -132,18 +130,18 @@ fds_aggr_setup( const struct input_field *input_fields,
 
             key_count++;
         }
-        else {           
+        else {
             // Count total values size
             memory->val_size += size_of[input[i].type];
-           
+
             // Count new array size
             const size_t array_size = (val_count + 1) * sizeof(struct field);
-            
+
             memory->val_list = realloc(memory->val_list, array_size);
             if(memory->key_list == NULL){
                 return FDS_ERR_NOMEM;
             }
-            
+
             memory->val_list[val_count].id = input[i].id;
             memory->val_list[val_count].type = input[i].type;
             memory->val_list[val_count].size = size_of[input[i].type];
@@ -163,20 +161,20 @@ fds_aggr_setup( const struct input_field *input_fields,
     return FDS_OK;
 }
 
-FDS_API
+FDS_API int
 fds_aggr_add_item(void *record, const struct fds_aggr_memory *memory){
     union fds_aggr_field_value *value;
     fds_aggr_get_element *get_element = memory->get_fnc;
-    
+
     int ret_code;
     int offset = 0;
-    
+
     // Can i do this in another way?
 
     // Make key
     for (int i = 0; i < memory->key_count; i++){
         ret_code = get_element(record, memory->key_list[i].id, value);
-        
+
         if (ret_code != FDS_OK){
             return ret_code;
         }
@@ -185,7 +183,7 @@ fds_aggr_add_item(void *record, const struct fds_aggr_memory *memory){
         offset += memory->key_list[i].size;
     }
 
-    // Getting value fields 
+    // Getting value fields
     for (int i = 0; i < memory->val_count; i++){
         ret_code = get_element(record, memory->val_list[i].id, value);
 
@@ -205,4 +203,34 @@ fds_aggr_add_item(void *record, const struct fds_aggr_memory *memory){
     }
 
     return FDS_OK;
+}
+
+FDS_API int
+fds_aggr_cursor_next(const struct list *table){
+
+    assert(table != NULL);
+
+    const struct list *tmp = table->next;
+
+    if (tmp == NULL){
+        return FDS_EOC;
+    }
+
+    tabel = tmp;
+    
+    return FDS_OK;
+}
+
+void
+fds_aggr_cleanup(struct fds_aggr_memory *memory){
+
+    assert(memory != NULL);
+    assert(memory->key_list != NULL);
+    assert(memory->val_list != NULL);
+    assert(memory->key != NULL);
+
+    free(memory->key_list);
+    free(memory->val_list);
+    free(memory->key);
+
 }
