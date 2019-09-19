@@ -41,19 +41,20 @@
  *
  */
 
-#include <libfds.h>
+#include <libfds/aggregator.h>
 
 /** Node for storing an item in a linked list */
 struct node{
-    char *key;           /*< Key of node */
+    char *key;                /*< Key of node */
     struct field *val_fields; /*< Value fields */
-    struct node *next;   /*< Next node   */
+    struct node *next;        /*< Next node   */
 };
 
 /** Structure for storing a linked list */
 struct list {
     struct node *head; /*< poiter to first element in the list */
     struct node *tail; /*< poiter to last element in the list  */
+    struct list *next; /*< Next linked list                    */
 };
 
 /** Information about hash table */
@@ -80,10 +81,10 @@ hash_fnc(char *key, size_t key_size);
   * \param[in] key      Key to be iserted
   * \param[in] key_size Size of key
   * \param[in] value    Value for given key
-  * 
+  *
   * \return #FDS_OK on success
   */
-FDS_API
+FDS_API int
 insert_key(const struct fds_aggr_memory *memory);
 
 /** \brief Fucntion for allocating for hash table
@@ -92,7 +93,7 @@ insert_key(const struct fds_aggr_memory *memory);
   * \param[in]  table_size Requared size of table
   * \param[out] table      Poiter to allocated memory for table
   */
-FDS_API
+FDS_API int
 hash_table_init(struct hash_table *table, size_t table_size);
 
 /** \brief Function finds the given key in the Linked List
@@ -100,10 +101,10 @@ hash_table_init(struct hash_table *table, size_t table_size);
   * \param[in] list Poiter to linked list
   * \param[in] key  Key to be found
   *
-  * \return In success, index of given key, 
+  * \return In success, index of given key,
   *  return -1 if key is not present
   */
-FDS_API
+FDS_API int
 find_key(struct node *list, char* key);
 
 /** \brief Function for getting node from linked list
