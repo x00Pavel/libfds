@@ -255,17 +255,18 @@ hash_table_init(struct hash_table *table, size_t table_size)
 	assert(table != NULL);
 	assert(table_size > 0);
 
-    table.list = (struct list *)calloc(table_size, sizeof(struct list));
-    if (table.list == NULL){
+    table->list = (struct list *)calloc(table_size, sizeof(struct list));
+    if (table->list == NULL){
         return FDS_ERR_NOMEM;
     }
 
 	for (int i = 0; i < table_size; i++){
-		table.list[i].head = NULL;
-		table.list[i].tail = NULL;
-        ((i + 1) != table_size) ? table.list[i].next = table.list[i + 1] : NULL;
+		table->list[i].head = NULL;
+		table->list[i].tail = NULL;
+        // Linking to list 
+        ((i + 1) != table_size) ? table->list[i].next = &table->list[i + 1] : NULL;
 	}
-	table.size = table_size;
+	table->size = table_size;
 
 
 	return FDS_OK;
@@ -298,7 +299,7 @@ find_key(const struct node *list, const char *key)
 	struct node *tmp = list;
 
 	while (tmp != NULL){
-		if(tmp->key = key){
+		if(tmp->key == key){
 			return index;
 		}
 		tmp = tmp->next;
@@ -309,7 +310,7 @@ find_key(const struct node *list, const char *key)
 }
 
 unsigned long
-hash_fnc(char *key, size_t key_size){return XXH64(key, key_size, 0)}
+hash_fnc(char *key, size_t key_size){return XXH64(key, key_size, 0);}
 
 FDS_API int
 insert_key(const struct fds_aggr_memory *memory)
@@ -321,35 +322,38 @@ insert_key(const struct fds_aggr_memory *memory)
     // Extracting Linked List at a given index
     const struct node *list = (struct node*) memory->table->list[index].head;
 
-    // Creating an item to insert in the hash table
+    // Creating an item to insert into hash table
 	const struct node *item = (struct node*) malloc(sizeof(struct node));
 	if (item == NULL){
-		hash_table_clean(table);
+		hash_table_clean(memory->table);
 		return FDS_ERR_NOMEM;
 	}
 
 	// Insert key
-	item->key = memore->key;
+    strncpy(item->key, memory->key, memory->key_size);
+    
+    // Isert all value fields
+    item->val_fields = (struct field *) malloc (sizeof(struct field) * memory->val_count + memory->val_size); 
+    strncpy(item->val_fields, memory->val_list,
+        sizeof(struct field) * memory->val_count + memory->val_size);
 
-	// Isert all value fields
-	item->val_fields = memory->val_list;
+    
+    item->next = NULL;
 
-	item->next = NULL;
-
-	// Iserting key on index
-    if (list == NULL){
-		// Absence of Linked List at a given Index of hash table
- 		table->list[index].head = item;
-		table->list[index].tail = item;
+    // Iserting key on index
+    if (list == NULL) {
+        // Absence of Linked List at a given Index of hash table
+        memory->table->list[index].head = item;
+        memory->table->list[index].tail = item;
 	} else {
         // A Linked List is present at given index of hash table
 		int find_index = find_key(list, memory->key);
 		if (find_index == FDS_ERR_NOTFOUND){
 			 // Key not found in existing linked list
 			 // Adding the key at the end of the linked list
-			table->list[index].tail->next = item;
-			table->list[index].tail = item;
-		} else {
+             memory->table->list[index].tail->next = item;
+             memory->table->list[index].tail = item;
+        } else {
 			// Key already present in linked list
 			// Updating the value of already existing key
 			struct node *element = get_element(list, find_index);
@@ -357,11 +361,11 @@ insert_key(const struct fds_aggr_memory *memory)
 			aggr_function fn;
 			// Do propriet function with field
 			for (int i = 0; i < memory->val_count; i++){
-				fn = get_function(memory->val_list[i]);
+				fn = get_function(&memory->val_list[i]);
 
-			 	ret_code = fn(memory->val_lsit[i], element->val_fields[i]);
+			 	ret_code = fn(&memory->val_list[i], element->val_fields[i]);
 
-				if(ret_code != FDS_Ok){
+				if(ret_code != FDS_OK){
 					return ret_code;
 				}
 			}
@@ -379,11 +383,11 @@ hash_table_clean(struct hash_table *table)
 
 	for (int i = 0; i < table->size; i++){
 
-        struct list *tmp_list = table->list[i];
-		struct node *tmp_node = tmp_list[tmp_index].head;
+        struct list *tmp_list = &table->list[i];
+		struct node *tmp_node = tmp_list->head;
 
 		while(tmp_node != NULL){
-			struct node *tmp_next = tmp_node.next;
+			struct node *tmp_next = tmp_node->next;
 			free(tmp_node);
 			tmp_node = tmp_next;
 		}
