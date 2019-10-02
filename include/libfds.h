@@ -52,6 +52,7 @@
  * \defgroup publicAPIs Public APIs
  * \brief APIs for manipulation with IPFIX Messages.
  */
+#include <libfds/aggregator.h>
 #include <libfds/api.h>
 #include <libfds/converters.h>
 #include <libfds/iemgr.h>

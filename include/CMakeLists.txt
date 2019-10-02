@@ -11,6 +11,7 @@ set(TOP_HEADERS
 
 set(SUB_HEADERS
 	"${PROJECT_BINARY_DIR}/include/libfds/api.h"
+	libfds/aggregator.h
 	libfds/converters.h
 	libfds/iemgr.h
 	libfds/drec.h
