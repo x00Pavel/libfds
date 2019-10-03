@@ -1,5 +1,5 @@
 /**
- * \file include/libfds/aggregator.h
+ * \file /include/libfds/aggregator.h
  * \author Lukas Hutak <lukas.hutak@cesnet.cz>
  * \author Pavel Yadlouski <xyadlo00@stud.fit.vutbr.cz>
  * \brief Aggregation modul for IPFIX collector (header file)
@@ -53,8 +53,6 @@
 #include <float.h>     // float min/max
 #include <libfds/api.h>
 
-#include "../../src/aggregator/hash_table.h"
-
 /** Enum of datatypes */
 enum fds_aggr_types {
      FDS_AGGR_OCTET_ARRAY = 0,
@@ -81,10 +79,12 @@ enum fds_aggr_types {
   * ptr_id MUST be specified or can be NULL
   * If ptr_id is not NULL, int_id will be ingnored.
   */
-union field_id{
-    uint32_t int_id; /*< Integer value of ID */
+union fds_aggr_field_id{
+    uint64_t int_id; /*< Integer value of ID */
     void *ptr_id;    /*< Pointer to ID       */
 };
+
+typedef struct fds_aggr_memory memory_s;
 
 /** Union for writing down value of field */
 union fds_aggr_field_value{
@@ -98,9 +98,21 @@ union fds_aggr_field_value{
     int64_t  int64;
     double   dbl;
     bool     boolean;
-    uint8_t  ip[16];
+    /*  Type for bouth IPv4 and IPv6. 
+        In case of IPv4, it mapped to IPv6 address. That hybrid address
+        consists of 80 "0" bits, followed by 16 "1" bits ("FFFF" in hexadecimal), followed by the
+        original 32-bit IPv4 address (too technical for most of us).
+
+        Here is an example of how that would work:
+        IPv4 address:	169.291.13.133
+        Maps to IPv6 address:	0000:0000:0000:0000:FFFF:A9DB:0D85
+        Simplified:	::FFFF:A9DB:0D85
+        The prefix of the mapped address places it in the range of mapped IPv4 addresses.
+        Because of that, the IPv4 portion is often left in the more familiar dotted-decimal format:
+        ::FFFF:169.219.13.133 */
+    uint8_t  ip[16]; 
     uint8_t  mac[6];
-    uint64_t timestamp;
+    uint64_t timestamp; // In nanoseconds
 };
 
 /** Avaliable functions of fields */
@@ -119,40 +131,17 @@ enum fds_aggr_function{
   * \param ID of field to be found
   * \param Union for writing down values (then this values will be set keys or values)
   *
-  * \return ID of field
+  * \return #FDS_OK on success
   */
-typedef int (*fds_aggr_get_element)(void *, union field_id, union fds_aggr_field_value *);
+typedef int (*fds_aggr_get_value)(void *, union fds_aggr_field_id, union fds_aggr_field_value *);
 
 /** Structure for description input fields */
-struct input_field {
-    union field_id id;          /*< ID of field                            */
+struct fds_aggr_input_field {
+    union fds_aggr_field_id id;          /*< ID of field                            */
     enum fds_aggr_types type;   /*< Datatype of value                      */
     enum fds_aggr_function fnc; /*< Function of field (KEY, SUM, MIN, etc) */
 
     // In future can be extendet
-};
-
-/** Informational structure with basic info about field */
-struct field{
-    union field_id id;                 /*< ID of field       */
-    union fds_aggr_field_value *value; /*< Value of field    */
-    enum fds_aggr_types type;          /*< Datatype of value */
-    size_t size;                       /*< Size of field     */
-    enum fds_aggr_function fnc;        /*< Function of field */
-};
-
-/** Structure for storing processed data about fields */
-struct fds_aggr_memory{
-    struct field *key_list;        /*< Array of all key fields   */
-    size_t key_count;              /*< Count of keu fields       */
-    size_t key_size;               /*< Size of key               */
-    char *key;                     /*< Pointer to allcated key   */
-    struct field *val_list;        /*< Array of all value fields */
-    size_t val_count;              /*< Count of value fields     */
-    size_t val_size;               /*< Size of all values fields */
-    uint32_t sort_flags;           /*< Sorting flags             */
-    fds_aggr_get_element *get_fnc; /*< Pointer to GET function (specified by user) */
-    struct hash_table *table;      /*< Poiter to hash table      */
 };
 
 /** \brief Function for initialization memory to use
@@ -173,7 +162,7 @@ struct fds_aggr_memory{
   * \return #FDS_ERR_NOMEM onli if allocation in hash_table_init fault
   */
 FDS_API int
-fds_aggr_init(struct fds_aggr_memory *memory);
+fds_aggr_create(memory_s *memory, size_t table_size);
 
 /** \brief Function for processing input data
  *
@@ -190,52 +179,53 @@ fds_aggr_init(struct fds_aggr_memory *memory);
  * \return #FDS_ERR_NOMEM in case of allocation error
  */
 FDS_API int
-fds_aggr_setup( const struct input_field *input_fields,
-                size_t input_size,
-                struct fds_aggr_memory *memory,
-                size_t table_size,
-                const fds_aggr_get_element *fnc);
-
+fds_aggr_setup(memory_s *memory, 
+               const struct fds_aggr_input_field *input_fields, 
+               size_t input_size,
+               fds_aggr_get_value *fnc, 
+               char *key);
+    
 /** \brief Function for cleaning all resources
-  *
-  */
-void
-fds_aggr_cleanup(struct fds_aggr_memory *memory);
+ *
+ */
+FDS_API int 
+fds_aggrdestroy(memory_s * memory);
 
 /** \brief Add item to hash table
-  *
-  * Function do following steps:
-  * 1. Find the field by ID
-  * 2. Get values from this fields
-  * 3. Do corresponding operation or aggregate as key field
-  * 4. Write down to hash table
-  *
-  * \param[in] record Pointer to data records
-  * \param[in] memory Pointer to structure with info about fields
-  *
-  * \return #FDS_OK on success
-  * \return #FDS_ERR_NOTFOUND if some fields not found during get_element function
-  */
+ *
+ * Function do following steps:
+ * 1. Find the field by ID
+ * 2. Get values from this fields
+ * 3. Do corresponding operation or aggregate as key field
+ * 4. Write down to hash table
+ *
+ * \param[in] record Pointer to data records
+ * \param[in] memory Pointer to structure with info about fields
+ *
+ * \return #FDS_OK on success
+ * \return #FDS_ERR_NOTFOUND if some fields not found during get_element function
+ */
 FDS_API int
-fds_aggr_add_item(void *record, const struct fds_aggr_memory *memory);
+fds_aggr_add_item(memory_s *memory, const void *record);
 
 /** \bried Function for initialization cursor for hasht table.
-  *
-  * \param[in] cursor Pointer to cursor
-  * \param[in] rec    Pointer to hash table
-  *
-  * Set #cursor on the first node in hash table
-  *
-  * \return FDS_OK on succes
-  */
-FDS_API int
-fds_aggr_cursor_init(struct list *cursor, const struct hash_table *table);
+ *
+ * \param[in] cursor Pointer to cursor
+ * \param[in] rec    Pointer to hash table
+ *
+ * Set #cursor on the first node in hash table
+ *
+ * \return FDS_OK on succes
+ */
+FDS_API int 
+fds_aggr_cursor_init(struct list * cursor, const struct hash_table *table);
+// fds_aggr_cursor_init(memory_s *memory);
 
 /** \brief Function for iteration through hash table
-  *
-  * \return FDS_OK on success
-  */
-FDS_API int
+ *
+ * \return FDS_OK on success
+ */
+FDS_API int 
 fds_aggr_cursor_next(const struct list *table);
 
 #ifdef __cplusplus
