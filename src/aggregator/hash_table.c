@@ -43,17 +43,18 @@
 
 
 #include <assert.h> // static_assert
-
+#include <libfds/api.h>
+#include "aggr_local_header.h"
 #include "hash_table.h"
 #include "xxhash.h"
 
-typedef int (*aggr_function)(const struct field *);
+typedef int (*aggr_function)(const struct field *, const struct field *);
 
 /**
  * \brief Function for making sum of values
  *
  * \param[in] src Pointer to sources value field
- * \param[out] dst Poiter to destenation value field
+ * \param[out] dst Poiter to destination value field
  *
  * \return #FDS_OK on success
 */
@@ -92,7 +93,7 @@ aggr_sum(const struct field *src, struct field *dst)
         dst->value->dbl += src->value->dbl;
         break;
     default:
-        // Hete must be error handling
+        // Here must be error handling
         return FDS_ERR_NOTFOUND;
     }
 
@@ -103,7 +104,7 @@ aggr_sum(const struct field *src, struct field *dst)
  * \brief Function for choosing maximum from two values
  *
  * \param[in] src Pointer to sources value field
- * \param[out] dst Poiter to destenation value field
+ * \param[out] dst Poiter to destination value field
  *
  * \return #FDS_OK on success
  */
@@ -155,7 +156,7 @@ aggr_max(const struct field *src, struct field *dst)
             dst->value->timestamp = src->value->timestamp;
         break;
     default:
-        // Hete must be error handling
+        // Here must be error handling
         return FDS_ERR_NOTFOUND;
     }
 
@@ -166,7 +167,7 @@ aggr_max(const struct field *src, struct field *dst)
  * \brief Function for choosing minimum from two values
  *
  * \param[in] src Pointer to sources value field
- * \param[out] dst Poiter to destenation value field
+ * \param[out] dst Poiter to destination value field
  *
  * \return #FDS_OK on success
  */
@@ -218,7 +219,7 @@ aggr_min(const struct field *src, struct field *dst)
             dst->value->timestamp = src->value->timestamp;
         break;
     default:
-        // Hete must be error handling
+        // Here must be error handling
         return FDS_ERR_NOTFOUND;
     }
 
@@ -332,15 +333,14 @@ insert_key(const struct fds_aggr_memory *memory)
 	// Insert key
     strncpy(item->key, memory->key, memory->key_size);
     
-    // Isert all value fields
-    item->val_fields = (struct field *) malloc (sizeof(struct field) * memory->val_count + memory->val_size); 
-    strncpy(item->val_fields, memory->val_list,
+    // Insert all value fields
+    *item->val_fields = (struct field *) malloc (sizeof(struct field) * memory->val_count + memory->val_size); 
+    strncpy(*item->val_fields, memory->val_list,
         sizeof(struct field) * memory->val_count + memory->val_size);
-
     
-    item->next = NULL;
+    *item->next = NULL;
 
-    // Iserting key on index
+    // Insetting key on index
     if (list == NULL) {
         // Absence of Linked List at a given Index of hash table
         memory->table->list[index].head = item;
@@ -359,7 +359,7 @@ insert_key(const struct fds_aggr_memory *memory)
 			struct node *element = get_element(list, find_index);
 
 			aggr_function fn;
-			// Do propriet function with field
+			// Do propriety function with field
 			for (int i = 0; i < memory->val_count; i++){
 				fn = get_function(&memory->val_list[i]);
 

@@ -41,13 +41,14 @@
  *
  */
 
-#include <libfds/aggregator.h>
+#include <libfds/api.h>
+#include "include/libfds/aggregator.h"
 
 /** Node for storing an item in a linked list */
 struct node{
     char *key;                /*< Key of node */
-    struct field *val_fields; /*< Value fields */
-    struct node *next;        /*< Next node   */
+    struct field **val_fields; /*< Value fields */
+    struct node **next;        /*< Next node   */
 };
 
 /** Structure for storing a linked list */
@@ -66,7 +67,7 @@ struct hash_table{
 /** \brief Function for generating hash
   *
   * \param[in] key      Base for hash function
-  * \param[in] key_szie Size of key
+  * \param[in] key_size Size of key
   *
   * \warning Be default, seed for hash function is 0
   *
@@ -75,25 +76,25 @@ struct hash_table{
 unsigned long
 hash_fnc(char *key, size_t key_size);
 
-/** \brief Fucntion for filling in key and value
+/** \brief Function for filling in key and value
   *
   * \param[in] table    Pointer to table
-  * \param[in] key      Key to be iserted
+  * \param[in] key      Key to be inserted
   * \param[in] key_size Size of key
   * \param[in] value    Value for given key
   *
   * \return #FDS_OK on success
   */
-FDS_API int
+FDS_API int 
 insert_key(const struct fds_aggr_memory *memory);
 
-/** \brief Fucntion for allocating for hash table
+/** \brief Function for allocating for hash table
   *
   * \param[in]  table      Poiter to table to initialization
-  * \param[in]  table_size Requared size of table
+  * \param[in]  table_size Required size of table
   * \param[out] table      Poiter to allocated memory for table
   */
-FDS_API int
+FDS_API int 
 hash_table_init(struct hash_table *table, size_t table_size);
 
 /** \brief Function finds the given key in the Linked List
@@ -105,7 +106,8 @@ hash_table_init(struct hash_table *table, size_t table_size);
   *  return -1 if key is not present
   */
 FDS_API int
-find_key(struct node *list, char* key);
+find_key(const struct node *list, const char *key);
+// find_key(struct node *list, char* key);
 
 /** \brief Function for getting node from linked list
   *
@@ -114,13 +116,11 @@ find_key(struct node *list, char* key);
   *
   * \return Pointer to node on given index in success or NULL if node is not found
   */
-struct node *
-get_element(struct node *list, int index);
-
+struct node * get_element(const struct node *list, int index);
 
 /** \brief Function for cleaning up resources
-  *
-  * \param[in] table Pointer to table to be cleaned
-  */
+ *
+ * \param[in] table Pointer to table to be cleaned
+ */
 void
 hash_table_clean(struct hash_table *table);
