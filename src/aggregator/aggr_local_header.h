@@ -57,15 +57,16 @@ struct field {
 typedef struct field field_s;
 
 /** Structure for storing processed data about fields */
-struct fds_aggr_memory {
+struct fds_aggr_s {
     field_s *key_list;           /*< Array of all key fields   */
     size_t key_count;            /*< Count of keu fields       */
     size_t key_size;             /*< Size of key               */
-    char *key;                   /*< Pointer to allocated key   */
+    char *key;                   /*< Pointer to allocated key  */
     field_s *val_list;           /*< Array of all value fields */
     size_t val_count;            /*< Count of value fields     */
     size_t val_size;             /*< Size of all values fields */
+    char *val;                   /*< All values                */
     uint32_t sort_flags;         /*< Sorting flags             */
-    fds_aggr_get_value *get_fnc; /*< Pointer to GET function (specified by user) */
+    fds_aggr_cb_get_value *get_fnc; /*< Pointer to GET function (specified by user) */
     struct hash_table *table;    /*< Poiter to hash table      */
 };
