@@ -42,51 +42,30 @@
  */
 
 #include <libfds/api.h>
-#include "include/libfds/aggregator.h"
+#include <libfds/aggregator.h>
+
+typedef struct fds_aggr_s fds_aggr_t;
+
+/**
+ * \brief Enumeration of return codes for hash table
+*/
+enum{
+  HASH_NEW,   /*< NEw element was created */
+  HASH_FOUND, /*< Key was found           */
+  HASH_ERR    /*< Any error               */
+};
 
 /** Node for storing an item in a linked list */
 struct node{
-    char *key;                /*< Key of node */
-    struct field **val_fields; /*< Value fields */
-    struct node **next;        /*< Next node   */
-};
-
-/** Structure for storing a linked list */
-struct list {
-    struct node *head; /*< poiter to first element in the list */
-    struct node *tail; /*< poiter to last element in the list  */
-    struct list *next; /*< Next linked list                    */
+    struct node *next; /*< Next node   */
+    uint8_t data[1];   /*< key:value*/
 };
 
 /** Information about hash table */
 struct hash_table{
-    size_t size;       /*< Count of free fields    */
-    struct list *list; /*< Array with linked lists */
+    size_t size;        /*< Count of free fields    */
+    struct node **list; /*< Array with linked lists */
 };
-
-/** \brief Function for generating hash
-  *
-  * \param[in] key      Base for hash function
-  * \param[in] key_size Size of key
-  *
-  * \warning Be default, seed for hash function is 0
-  *
-  * \return Index to hash table
-  */
-unsigned long
-hash_fnc(char *key, size_t key_size);
-
-/** \brief Function for filling in key and value
-  *
-  * \param[in] table    Pointer to table
-  * \param[in] key      Key to be inserted
-  * \param[in] key_size Size of key
-  * \param[in] value    Value for given key
-  *
-  * \return #FDS_OK on success
-  */
-FDS_API int 
-insert_key(const struct fds_aggr_memory *memory);
 
 /** \brief Function for allocating for hash table
   *
@@ -94,29 +73,22 @@ insert_key(const struct fds_aggr_memory *memory);
   * \param[in]  table_size Required size of table
   * \param[out] table      Poiter to allocated memory for table
   */
-FDS_API int 
+int 
 hash_table_init(struct hash_table *table, size_t table_size);
 
-/** \brief Function finds the given key in the Linked List
-  *
-  * \param[in] list Poiter to linked list
-  * \param[in] key  Key to be found
-  *
-  * \return In success, index of given key,
-  *  return -1 if key is not present
-  */
-FDS_API int
-find_key(const struct node *list, const char *key);
-// find_key(struct node *list, char* key);
-
-/** \brief Function for getting node from linked list
+/** \brief Return pointer to element. 
+  * If element is not in the hash table, then will be created new element and return it
   *
   * \param[in] list  Poiter to linked list
-  * \param[in] index Index to be found
+  * \param[out] res Pointer to element to fill in    
   *
-  * \return Pointer to node on given index in success or NULL if node is not found
+  * \return #HASH_NEW if element was not in the list
+  * \return #HASH_FOUND if element with key was found 
+  * \return #HASH_ERR in case of any error 
   */
-struct node * get_element(const struct node *list, int index);
+
+int 
+get_element(const fds_aggr_t *memory, struct node **res);
 
 /** \brief Function for cleaning up resources
  *
