@@ -2,7 +2,7 @@
  * \file /include/libfds/aggregator.h
  * \author Lukas Hutak <lukas.hutak@cesnet.cz>
  * \author Pavel Yadlouski <xyadlo00@stud.fit.vutbr.cz>
- * \brief Aggregation modul for IPFIX collector (header file)
+ * \brief Aggregation module for IPFIX collector (header file)
  * \date July 2019
  */
 /**
@@ -55,29 +55,27 @@
 
 /** Enum of datatypes */
 enum fds_aggr_types {
-     FDS_AGGR_OCTET_ARRAY = 0,
-     FDS_AGGR_UNSIGNED_8 = 1,
-     FDS_AGGR_UNSIGNED_16 = 2,
-     FDS_AGGR_UNSIGNED_32 = 3,
-     FDS_AGGR_UNSIGNED_64 = 4,
-     FDS_AGGR_SIGNED_8 = 5,
-     FDS_AGGR_SIGNED_16 = 6,
-     FDS_AGGR_SIGNED_32 = 7,
-     FDS_AGGR_SIGNED_64 = 8,
-     FDS_AGGR_DOUBLE = 9,
-     FDS_AGGR_BOOLEAN = 10,
-     FDS_AGGR_MAC_ADDRESS = 11,
-     FDS_AGGR_STRING = 12,
-     FDS_AGGR_IPV4_ADDRESS = 13,
-     FDS_AGGR_IPV6_ADDRESS = 14,
-     FDS_AGGR_DATE_TIME_NANOSECONDS = 15,
+     FDS_AGGR_UNSIGNED_8 = 0,
+     FDS_AGGR_UNSIGNED_16 = 1,
+     FDS_AGGR_UNSIGNED_32 = 2,
+     FDS_AGGR_UNSIGNED_64 = 3,
+     FDS_AGGR_SIGNED_8 = 4,
+     FDS_AGGR_SIGNED_16 = 5,
+     FDS_AGGR_SIGNED_32 = 6,
+     FDS_AGGR_SIGNED_64 = 7,
+     FDS_AGGR_DOUBLE = 8,
+     FDS_AGGR_BOOLEAN = 9,
+     FDS_AGGR_MAC_ADDRESS = 10,
+     FDS_AGGR_STRING = 11,
+     FDS_AGGR_IP_ADDRESS = 12, // For both IPv4 and IPv6
+     FDS_AGGR_DATE_TIME_NANOSECONDS = 13,
      FDS_AGGR_UNASSIGNED = 255
 };
 
 
 /** Union represents ID of element. ID can be integer or pointer (and other)
   * ptr_id MUST be specified or can be NULL
-  * If ptr_id is not NULL, int_id will be ingnored.
+  * If ptr_id is not NULL, int_id will be ignored.
   */
 union fds_aggr_field_id{
     uint64_t int_id; /*< Integer value of ID */
@@ -98,7 +96,7 @@ union fds_aggr_field_value{
     int64_t  int64;
     double   dbl;
     bool     boolean;
-    /*  Type for bouth IPv4 and IPv6. 
+    /*  Type for both IPv4 and IPv6. 
         In case of IPv4, it mapped to IPv6 address. That hybrid address
         consists of 80 "0" bits, followed by 16 "1" bits ("FFFF" in hexadecimal), followed by the
         original 32-bit IPv4 address (too technical for most of us).
@@ -117,10 +115,11 @@ union fds_aggr_field_value{
 
 /** Avaliable functions of fields */
 enum fds_aggr_function{
-    FDS_SUM,
-    FDS_MIN,
-    FDS_MAX,
-    FDS_KEY_FIELD
+    FDS_AGGR_SUM,
+    FDS_AGGR_MIN,
+    FDS_AGGR_MAX,
+    FDS_AGGR_OR,
+    FDS_AGGR_KEY
 };
 
 /** \brief Pointer to function for processing data record
@@ -133,7 +132,7 @@ enum fds_aggr_function{
   *
   * \return #FDS_OK on success
   */
-typedef int (*fds_aggr_get_value)(void *, union fds_aggr_field_id, union fds_aggr_field_value *);
+typedef int (*fds_aggr_cb_get_value)(void *, union fds_aggr_field_id, union fds_aggr_field_value *);
 
 /** Structure for description input fields */
 struct fds_aggr_input_field {
@@ -159,10 +158,10 @@ struct fds_aggr_input_field {
   * \param[in] table_size Required size of hash table
   *
   * \return #FDS_OK On success
-  * \return #FDS_ERR_NOMEM onli if allocation in hash_table_init fault
+  * \return #FDS_ERR_NOMEM only if allocation in hash_table_init fault
   */
-FDS_API int
-fds_aggr_create(memory_s *memory, size_t table_size);
+fds_aggr_t *
+fds_aggr_create(fds_aggr_t *memory, size_t table_size);
 
 /** \brief Function for processing input data
  *
@@ -179,17 +178,17 @@ fds_aggr_create(memory_s *memory, size_t table_size);
  * \return #FDS_ERR_NOMEM in case of allocation error
  */
 FDS_API int
-fds_aggr_setup(memory_s *memory, 
+fds_aggr_setup(fds_aggr_t *memory, 
                const struct fds_aggr_input_field *input_fields, 
                size_t input_size,
-               fds_aggr_get_value *fnc, 
+               fds_aggr_cb_get_value *fnc, 
                char *key);
     
 /** \brief Function for cleaning all resources
  *
  */
 FDS_API int 
-fds_aggrdestroy(memory_s * memory);
+fds_aggr_destroy(fds_aggr_t *memory);
 
 /** \brief Add item to hash table
  *
@@ -208,14 +207,14 @@ fds_aggrdestroy(memory_s * memory);
 FDS_API int
 fds_aggr_add_item(memory_s *memory, const void *record);
 
-/** \bried Function for initialization cursor for hasht table.
+/** \brief Function for initialization cursor for hash table.
  *
  * \param[in] cursor Pointer to cursor
  * \param[in] rec    Pointer to hash table
  *
  * Set #cursor on the first node in hash table
  *
- * \return FDS_OK on succes
+ * \return FDS_OK on success
  */
 FDS_API int 
 fds_aggr_cursor_init(struct list * cursor, const struct hash_table *table);

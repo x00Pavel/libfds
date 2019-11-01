@@ -42,11 +42,12 @@
  */
 
 #include <assert.h>
-#include <libfds.h>
+#include <string.h> // memcpy
+#include <float.h>  // float min/max
+#include <libfds/api.h>
+#include <libfds/aggregator.h>
 #include "hash_table.h"
 #include "aggr_local_header.h"
-
-typedef struct fds_aggr_memory memory_s;
 
 /** Array of sizes of used datatypes.
   * DO NOT REORDER,
@@ -72,12 +73,210 @@ size_t size_of[] = {
      8  // size of unassigned data
 };
 
+typedef struct fds_aggr_s fds_aggr_t;
+typedef struct hash_table fds_aggr_hash_table_t;
+typedef int (*aggr_function)(const struct field *, const struct field *);
 
-FDS_API int
-fds_aggr_init(memory_s *memory, size_t table_size){
+/**
+ * \brief Function for making sum of values
+ *
+ * \param[in] src Pointer to sources value field
+ * \param[out] dst Poiter to destination value field
+ *
+ * \return #FDS_OK on success
+ */
+int
+aggr_sum(const struct field *src, struct field *dst)
+{
+    assert(src != NULL);
+    assert(dst != NULL);
 
+    switch (src->type) {
+    case FDS_AGGR_UNSIGNED_8:
+        dst->value->uint8 += src->value->uint8;
+        break;
+    case FDS_AGGR_UNSIGNED_16:
+        dst->value->uint16 += src->value->uint16;
+        break;
+    case FDS_AGGR_UNSIGNED_32:
+        dst->value->uint32 += src->value->uint32;
+        break;
+    case FDS_AGGR_UNSIGNED_64:
+        dst->value->uint64 += src->value->uint64;
+        break;
+    case FDS_AGGR_SIGNED_8:
+        dst->value->int8 += src->value->int8;
+        break;
+    case FDS_AGGR_SIGNED_16:
+        dst->value->int16 += src->value->int16;
+        break;
+    case FDS_AGGR_SIGNED_32:
+        dst->value->int32 += src->value->int32;
+        break;
+    case FDS_AGGR_SIGNED_64:
+        dst->value->int64 += src->value->int64;
+        break;
+    case FDS_AGGR_DOUBLE:
+        dst->value->dbl += src->value->dbl;
+        break;
+    default:
+        // Here must be error handling
+        return FDS_ERR_NOTFOUND;
+    }
+
+    return FDS_OK;
+}
+
+/**
+ * \brief Function for choosing maximum from two values
+ *
+ * \param[in] src Pointer to sources value field
+ * \param[out] dst Poiter to destination value field
+ *
+ * \return #FDS_OK on success
+ */
+int
+aggr_max(const struct field *src, struct field *dst){
+    assert(src != NULL);
+    assert(dst != NULL);
+
+    switch (src->type) {
+    case FDS_AGGR_UNSIGNED_8:
+        if (src->value->uint8 > dst->value->uint8)
+            dst->value->uint8 = src->value->uint8;
+        break;
+    case FDS_AGGR_UNSIGNED_16:
+        if (src->value->uint8 > dst->value->uint8)
+            dst->value->uint16 = src->value->uint16;
+        break;
+    case FDS_AGGR_UNSIGNED_32:
+        if (src->value->uint32 > dst->value->uint32)
+            dst->value->uint32 = src->value->uint32;
+        break;
+    case FDS_AGGR_UNSIGNED_64:
+        if (src->value->uint64 > dst->value->uint64)
+            dst->value->uint64 = src->value->uint64;
+        break;
+    case FDS_AGGR_SIGNED_8:
+        if (src->value->int8 > dst->value->int8)
+            dst->value->int8 = src->value->int8;
+        break;
+    case FDS_AGGR_SIGNED_16:
+        if (src->value->int16 > dst->value->int16)
+            dst->value->int16 = src->value->int16;
+        break;
+    case FDS_AGGR_SIGNED_32:
+        if (src->value->int32 > dst->value->int32)
+            dst->value->int32 = src->value->int32;
+        break;
+    case FDS_AGGR_SIGNED_64:
+        if (src->value->int64 > dst->value->int64)
+            dst->value->int64 = src->value->int64;
+        break;
+    case FDS_AGGR_DOUBLE:
+        if (src->value->dbl > dst->value->dbl)
+            dst->value->dbl = src->value->dbl;
+        break;
+    case FDS_AGGR_DATE_TIME_NANOSECONDS:
+        if (src->value->timestamp > dst->value->timestamp)
+            dst->value->timestamp = src->value->timestamp;
+        break;
+    default:
+        // Here must be error handling
+        return FDS_ERR_NOTFOUND;
+    }
+
+    return FDS_OK;
+}
+
+/**
+ * \brief Function for choosing minimum from two values
+ *
+ * \param[in] src Pointer to sources value field
+ * \param[out] dst Poiter to destination value field
+ *
+ * \return #FDS_OK on success
+ */
+int
+aggr_min(const struct field *src, struct field *dst){
+    assert(src != NULL);
+    assert(dst != NULL);
+
+    switch (src->type) {
+    case FDS_AGGR_UNSIGNED_8:
+        if (src->value->uint8 < dst->value->uint8)
+            dst->value->uint8 = src->value->uint8;
+        break;
+    case FDS_AGGR_UNSIGNED_16:
+        if (src->value->uint8 < dst->value->uint8)
+            dst->value->uint16 = src->value->uint16;
+        break;
+    case FDS_AGGR_UNSIGNED_32:
+        if (src->value->uint32 < dst->value->uint32)
+            dst->value->uint32 = src->value->uint32;
+        break;
+    case FDS_AGGR_UNSIGNED_64:
+        if (src->value->uint64 < dst->value->uint64)
+            dst->value->uint64 = src->value->uint64;
+        break;
+    case FDS_AGGR_SIGNED_8:
+        if (src->value->int8 < dst->value->int8)
+            dst->value->int8 = src->value->int8;
+        break;
+    case FDS_AGGR_SIGNED_16:
+        if (src->value->int16 < dst->value->int16)
+            dst->value->int16 = src->value->int16;
+        break;
+    case FDS_AGGR_SIGNED_32:
+        if (src->value->int32 < dst->value->int32)
+            dst->value->int32 = src->value->int32;
+        break;
+    case FDS_AGGR_SIGNED_64:
+        if (src->value->int64 < dst->value->int64)
+            dst->value->int64 = src->value->int64;
+        break;
+    case FDS_AGGR_DOUBLE:
+        if (src->value->dbl < dst->value->dbl)
+            dst->value->dbl = src->value->dbl;
+        break;
+    case FDS_AGGR_DATE_TIME_NANOSECONDS:
+        if (src->value->timestamp < dst->value->timestamp)
+            dst->value->timestamp = src->value->timestamp;
+        break;
+    default:
+        // Here must be error handling
+        return FDS_ERR_NOTFOUND;
+    }
+
+    return FDS_OK;
+}
+
+int 
+aggr_or(const struct field *src, struct field *dst){
+
+}
+/**
+ * \brief Find a function for value field
+ *
+ * \param[in] field Field to process
+ *
+ *  \return Conversion function
+ */
+aggr_function
+get_function(const struct field *field)
+{
+    // Aggregation functions
+    static const aggr_function table[] = {&aggr_sum, &aggr_min, &aggr_max, &aggr_or};
+
+    const enum fds_aggr_function function = field->fnc;
+
+    return table[function];
+}
+
+fds_aggr_t *
+fds_aggr_create(fds_aggr_t *memory, size_t table_size){
     if (memory == NULL){
-        return FDS_ERR_ARG;
+        return NULL;
     }
 
     memory->key_list = NULL;
@@ -92,22 +291,26 @@ fds_aggr_init(memory_s *memory, size_t table_size){
     // Initialization of hash table
     int rc = hash_table_init(memory->table, table_size);
     if (rc != FDS_OK){
-        return rc;
+        return NULL;
     }
-    return FDS_OK;
+    return memory;
 }
 
-FDS_API int
-fds_aggr_setup(memory_s *memory, 
+int
+fds_aggr_setup(fds_aggr_t *memory, 
                const struct fds_aggr_input_field *input_fields, 
                size_t input_size,
-               fds_aggr_get_value *fnc, 
-               char *key)
-{
+               fds_aggr_cb_get_value *fnc, 
+               char *key){
     assert(input_fields != NULL);
     assert(fnc != NULL);
     assert(memory != NULL);
     assert(input_size > 0);
+
+    if ((input_fields == NULL) || (input_size == 0)){
+        return FDS_ERR_ARG;
+    }
+    
 
     int key_count = 0;
     int val_count = 0;
@@ -115,7 +318,7 @@ fds_aggr_setup(memory_s *memory,
     memory->get_fnc = fnc;
 
     for (int i = 0; i < input_size; i++){
-        if (input_fields[i].fnc == FDS_KEY_FIELD){
+        if (input_fields[i].fnc == FDS_AGGR_KEY){
             // Count total key size
             memory->key_size += size_of[input_fields[i].type];
 
@@ -128,7 +331,7 @@ fds_aggr_setup(memory_s *memory,
             }
 
             memory->key_list[key_count].id = input_fields[i].id;
-            memory->val_list[val_count].type = input_fields[i].type;
+            memory->val_list[key_count].type = input_fields[i].type;
             memory->key_list[key_count].size = size_of[input_fields[i].type];
             memory->key_list[key_count].fnc = input_fields[i].fnc;
 
@@ -154,6 +357,11 @@ fds_aggr_setup(memory_s *memory,
         }
     }
 
+    // If user did not set any key or value field
+    if((key_count == 0) || (val_count == 0)){
+        return FDS_ERR_ARG;
+    }
+
     memory->key_count = key_count;
     memory->val_count = val_count;
 
@@ -165,69 +373,98 @@ fds_aggr_setup(memory_s *memory,
     return FDS_OK;
 }
 
-FDS_API int
-fds_aggr_add_item(memory_s *memory, const void *record)
-{
-    union fds_aggr_field_value *value;
-    fds_aggr_get_value get_element = memory->get_fnc;
+int
+fds_aggr_add_record(fds_aggr_t *memory, const void *record){
+    // union fds_aggr_field_value *value;
+    fds_aggr_cb_get_value get_value = memory->get_fnc;
 
     int ret_code;
-    int offset = 0;
+    int key_offset = 0;
+    int val_offset = 0;
 
     // Can i do this in another way?
 
     // Make key
     for (int i = 0; i < memory->key_count; i++){
-        ret_code = get_element(record, memory->key_list[i].id, value);
-
+        ret_code = get_value(record, memory->key_list[i].id, memory->key_list[i].value);
         if (ret_code != FDS_OK){
             return ret_code;
         }
 
-        memory->key[offset] = (char *)value;
-        offset += memory->key_list[i].size;
+        memcpy(memory->key[key_offset], (char *) memory->key_list[i].value, memory->key_list[i].size);
+        key_offset += memory->key_list[i].size;
     }
 
     // Getting value fields
     for (int i = 0; i < memory->val_count; i++){
-        ret_code = get_element(record, memory->val_list[i].id, value);
+        ret_code = get_value(record, memory->val_list[i].id, memory->val_list[i].value);
 
         if (ret_code != FDS_OK){
             return ret_code;
         }
 
-        memory->val_list[offset].value = value;
-        offset += memory->key_list[i].size;
+        memory->val[val_offset] = memory->val_list[i].value;
+        memcpy(memory->val[val_offset], memory->val_list[i].value, memory->val_list[i].size);
+        val_offset += memory->val_list[i].size;
     }
 
     // Insert key to hash table
-    ret_code = insert_key(memory);
+    struct node *item;
+    ret_code = get_element(memory, &item);
 
-    if(ret_code != FDS_OK){
-        return ret_code;
+    // Insert values to node in hash table
+    if(ret_code == HASH_NEW){
+        // It mas first node with this key 
+        memcpy(item->data[memory->key_size], memory->val, memory->val_size);
+    }
+    else if (ret_code == HASH_FOUND){
+        // Key already present in hash table, so actualize it value
+        char *val_list = item->data[memory->key_size];
+        for (int i = 0; i < memory->val_count; i++){
+            aggr_function fnc = get_function(memory->val_list[i].fnc);
+
+            // fnc();
+        }        
+    }
+    else{
+        // There was an error
+        return FDS_ERR_ARG;
     }
 
     return FDS_OK;
 }
 
-FDS_API int
-fds_aggr_cursor_next(const struct list *table)
-{
-    assert(table != NULL);
+int
+fds_aggr_cursor_init(fds_aggr_cursor_t *cursor, const fds_aggr_hash_table_t *table){
 
-    const struct list *tmp = table->next;
+    assert(cursor != NULL);
+
+    cursor = (fds_aggr_cursor_t *) malloc(sizeof(fds_aggr_cursor_s));
+    if (cursor == NULL){
+        return FDS_ERR_NOMEM;
+    }
+
+
+}
+
+int
+fds_aggr_cursor_next(fds_aggr_cursor_t *cursor)
+{
+    assert(cursor != NULL);
+
+    const fds_aggr_cursor_t *tmp = cursor->next;
 
     if (tmp == NULL){
         return FDS_EOC;
     }
 
-    table = tmp;
+    cursor = tmp;
     
     return FDS_OK;
 }
 
-FDS_API int
-fds_aggr_destroy(memory_s *memory){
+int
+fds_aggr_destroy(fds_aggr_t *memory){
 
     assert(memory != NULL);
     assert(memory->key_list != NULL);
