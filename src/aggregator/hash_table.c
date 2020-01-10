@@ -112,14 +112,14 @@ find_key(const struct node *list, const char *key, size_t key_size, struct node 
 unsigned long
 hash_fnc(char *key, size_t key_size){return XXH64(key, key_size, 0);}
 
-/** \brief Function for filling in key and value
+/** \brief Function for geting element
  *
- * \param[in] table    Pointer to table
- * \param[in] key      Key to be inserted
- * \param[in] key_size Size of key
- * \param[in] value    Value for given key
+ * \param[in]  memory  Aggregator memory
+ * \param[out] res     Return element
  *
- * \return #FDS_OK on success
+ * \return #HASH_NEW   in case if new item was inserted
+ * \return #HASH_FOUND if element with giving key was found  
+ * \return #HASH_ERR   in case of any error 
  */
 int 
 get_element(const fds_aggr_t *memory, struct node **res)

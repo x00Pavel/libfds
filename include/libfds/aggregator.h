@@ -82,7 +82,7 @@ union fds_aggr_field_id{
     void *ptr_id;    /*< Pointer to ID       */
 };
 
-typedef struct fds_aggr_memory memory_s;
+typedef struct fds_aggr_memory fds_aggr_t;
 
 /** Union for writing down value of field */
 union fds_aggr_field_value{
@@ -205,7 +205,7 @@ fds_aggr_destroy(fds_aggr_t *memory);
  * \return #FDS_ERR_NOTFOUND if some fields not found during get_element function
  */
 FDS_API int
-fds_aggr_add_item(memory_s *memory, const void *record);
+fds_aggr_add_item(fds_aggr_t *memory, const void *record);
 
 /** \brief Function for initialization cursor for hash table.
  *
@@ -216,16 +216,16 @@ fds_aggr_add_item(memory_s *memory, const void *record);
  *
  * \return FDS_OK on success
  */
-FDS_API int 
-fds_aggr_cursor_init(struct list * cursor, const struct hash_table *table);
+// FDS_API int 
+// fds_aggr_cursor_init(struct list * cursor, const struct hash_table *table);
 // fds_aggr_cursor_init(memory_s *memory);
 
 /** \brief Function for iteration through hash table
  *
  * \return FDS_OK on success
  */
-FDS_API int 
-fds_aggr_cursor_next(const struct list *table);
+// FDS_API int 
+// fds_aggr_cursor_next(const struct list *table);
 
 #ifdef __cplusplus
     }

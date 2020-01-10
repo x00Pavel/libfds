@@ -75,7 +75,13 @@ size_t size_of[] = {
 
 typedef struct fds_aggr_s fds_aggr_t;
 typedef struct hash_table fds_aggr_hash_table_t;
-typedef int (*aggr_function)(const struct field *, const struct field *);
+typedef int (*aggr_function)(void *, void *);
+
+static inline int
+aggr_sum_uint8(uint8_t src, uint8_t dst)
+{
+    return dst + src;
+}
 
 /**
  * \brief Function for making sum of values
@@ -88,9 +94,6 @@ typedef int (*aggr_function)(const struct field *, const struct field *);
 int
 aggr_sum(const struct field *src, struct field *dst)
 {
-    assert(src != NULL);
-    assert(dst != NULL);
-
     switch (src->type) {
     case FDS_AGGR_UNSIGNED_8:
         dst->value->uint8 += src->value->uint8;
@@ -266,11 +269,60 @@ aggr_function
 get_function(const struct field *field)
 {
     // Aggregation functions
-    static const aggr_function table[] = {&aggr_sum, &aggr_min, &aggr_max, &aggr_or};
+    // static const aggr_function table[] = {&aggr_sum, &aggr_min, &aggr_max, &aggr_or};
+    // const enum fds_aggr_function function = field->fnc;
+    // return table[function];
 
-    const enum fds_aggr_function function = field->fnc;
+    switch(field->type){
+    case FDS_AGGR_UNSIGNED_8:
+        switch (field->fnc)
+        {
+        case FDS_AGGR_SUM :            
+            return &aggr_sum_uint8;
+        case FDS_AGGR_MIN:
+            return &aggr_min_uint8;
+        case FDS_AGGR_MAX:
+            return &aggr_max_uint8;
+        case FDS_AGGR_OR:
+            return &aggr_or_uint8;
+        default:
+            break;
+        }
+        break;
+    case FDS_AGGR_UNSIGNED_16:
+        break;
+    case FDS_AGGR_UNSIGNED_32:
+        break;
+    case FDS_AGGR_UNSIGNED_64:
+        break;
+    case FDS_AGGR_SIGNED_8:
+        break;
+    case FDS_AGGR_SIGNED_16:
+        break;
+    case FDS_AGGR_SIGNED_32:
+        break;
+    case FDS_AGGR_SIGNED_64:
+        break;
+    case FDS_AGGR_DOUBLE:
+        break;
+    case FDS_AGGR_BOOLEAN: 
+        break;
+    case FDS_AGGR_MAC_ADDRESS:
+        break;
+    case FDS_AGGR_STRING:
+        break;
+    case FDS_AGGR_IP_ADDRESS:
+        break;
+    case FDS_AGGR_DATE_TIME_NANOSECONDS:
+        break;
+    default:
+        break; 
 
-    return table[function];
+    }
+
+
+
+
 }
 
 fds_aggr_t *
@@ -338,6 +390,7 @@ fds_aggr_setup(fds_aggr_t *memory,
             key_count++;
         }
         else {
+            // dodat vyber funkci pres switch jako v libnf 
             // Count total values size
             memory->val_size += size_of[input_fields[i].type];
 
@@ -382,8 +435,6 @@ fds_aggr_add_record(fds_aggr_t *memory, const void *record){
     int key_offset = 0;
     int val_offset = 0;
 
-    // Can i do this in another way?
-
     // Make key
     for (int i = 0; i < memory->key_count; i++){
         ret_code = get_value(record, memory->key_list[i].id, memory->key_list[i].value);
@@ -414,26 +465,41 @@ fds_aggr_add_record(fds_aggr_t *memory, const void *record){
 
     // Insert values to node in hash table
     if(ret_code == HASH_NEW){
-        // It mas first node with this key 
+        // It is first node with this key 
         memcpy(item->data[memory->key_size], memory->val, memory->val_size);
     }
     else if (ret_code == HASH_FOUND){
         // Key already present in hash table, so actualize it value
         char *val_list = item->data[memory->key_size];
+        
+        // Offset of new value 
+        size_t offset = 0;
         for (int i = 0; i < memory->val_count; i++){
+            // Get function of relevant value
             aggr_function fnc = get_function(memory->val_list[i].fnc);
 
-            // fnc();
+            // Copy value to actualize it
+            int32_t *val = (int32_t *) malloc(sizeof(memory->val_list[i].size));
+            memcpy(val, val_list[offset], memory->val_list[i].size);
+            
+            // Actualize value
+            fnc(memory->val_list[i].value, val);
+
+            // Insert actualized value on it place
+            memcpy(val_list[offset], val, memory->val_list[i].size);
+
+            // Actualize offset 
+            offset += memory->val_list[i].size;
         }        
     }
     else{
-        // There was an error
+        // There is an error
         return FDS_ERR_ARG;
     }
 
     return FDS_OK;
 }
-
+/*
 int
 fds_aggr_cursor_init(fds_aggr_cursor_t *cursor, const fds_aggr_hash_table_t *table){
 
@@ -462,7 +528,7 @@ fds_aggr_cursor_next(fds_aggr_cursor_t *cursor)
     
     return FDS_OK;
 }
-
+*/
 int
 fds_aggr_destroy(fds_aggr_t *memory){
 
