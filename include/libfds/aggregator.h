@@ -205,7 +205,7 @@ fds_aggr_destroy(fds_aggr_t *memory);
  * \return #FDS_ERR_NOTFOUND if some fields not found during get_element function
  */
 FDS_API int
-fds_aggr_add_item(fds_aggr_t *memory, const void *record);
+fds_aggr_add_record(fds_aggr_t *memory, const void *record);
 
 /** \brief Function for initialization cursor for hash table.
  *
